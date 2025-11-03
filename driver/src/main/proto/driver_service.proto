@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package com.metrocarpool.driver;
+
+//option java_multiple_files = true;
+//option java_package = "com.metrocarpool.driver.proto";
+//option java_outer_classname = "DriverProto";
+
+service DriverService {
+  rpc PostDriverInfo (PostDriver) returns (DriverStatusResponse);
+}
+
+message DriverStatusResponse {
+  bool status = 1;
+}
+
+message PostDriver {
+  int64 driverId = 1;
+  repeated string routeStations = 2;
+  string finalDestination = 3;
+}
