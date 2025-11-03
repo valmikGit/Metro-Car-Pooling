@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package com.metrocarpool.user;
+
+import "google/protobuf/timestamp.proto";
+
+option java_multiple_files = true;
+option java_package = "com.metrocarpool.user.proto";
+option java_outer_classname = "UserProto";
+
+service DriverService {
+  rpc UserSignUpRequest (UserSignUp) returns (SignUpOrLoginResponse);
+  rpc UserLoginRequest (UserLogin) returns (SignUpOrLoginResponse);
+}
+
+enum UserType {
+  DRIVER = 0;
+  RIDER = 1;
+}
+
+message UserSignUp {
+  string username = 1;
+  string password = 2;
+  UserType userType = 3;
+  int64 licenseId = 4;
+  google.protobuf.Timestamp createdAt = 5;
+}
+
+message UserLogin {
+  string username = 1;
+  string password = 2;
+}
+
+message SignUpOrLoginResponse {
+  int32 STATUS_CODE = 1;
+}

@@ -2,9 +2,11 @@ syntax = "proto3";
 
 package com.metrocarpool.driver;
 
-//option java_multiple_files = true;
-//option java_package = "com.metrocarpool.driver.proto";
-//option java_outer_classname = "DriverProto";
+import "google/protobuf/timestamp.proto";
+
+option java_multiple_files = true;
+option java_package = "com.metrocarpool.driver.proto";
+option java_outer_classname = "DriverProto";
 
 service DriverService {
   rpc PostDriverInfo (PostDriver) returns (DriverStatusResponse);

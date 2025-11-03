@@ -91,7 +91,7 @@
         <dependency>
             <groupId>com.metrocarpool</groupId>
             <artifactId>contracts</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
+            <version>0.0.1-SNAPSHOT</version>
         </dependency>
 	</dependencies>
 	<dependencyManagement>

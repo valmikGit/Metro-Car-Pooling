@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package com.metrocarpool.notification;
+
+import "google/protobuf/timestamp.proto";
+
+option java_multiple_files = true;
+option java_package = "com.metrocarpool.notification.proto";
+option java_outer_classname = "NotificationProto";
+
+service DriverService {
+  rpc MatchNotificationInitiationPost (NotificationInitiation) returns (stream RiderDriverMatch);
+  rpc DriverRideCompletionNotificationInitiationPost (NotificationInitiation)
+      returns (stream DriverRideCompletion);
+  rpc RiderRideCompletionNotificationInitiationPost (NotificationInitiation)
+      returns (stream RiderRideCompletion);
+}
+
+message RiderDriverMatch {
+  int64 riderId = 1;
+  int64 driverId = 2;
+  google.protobuf.Timestamp driverArrivalTime = 3;
+}
+
+message NotificationInitiation {
+  bool status = 1;
+}
+
+message DriverRideCompletion {
+  int64 driverId = 1;
+  string completionMessage = 2;
+}
+
+message RiderRideCompletion {
+  int64 riderId = 1;
+  string completionMessage = 2;
+}

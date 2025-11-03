@@ -2,12 +2,19 @@ syntax = "proto3";
 
 package com.metrocarpool.events;
 
-//// Optionally define the Java package
-//option java_package = "com.metrocarpool.events";
-//option java_multiple_files = true;
+// Optionally define the Java package
+option java_multiple_files = true;
+option java_package = "com.metrocarpool.contracts.proto";
+option java_outer_classname = "RiderCompletionAllUsersEvent";
+
+enum UserType {
+  DRIVER = 0;
+  RIDER = 1;
+}
 
 // The Kafka event definition
 message RiderCompletionAllUsersEvent {
   int64 userId = 1;
   string status = 2;
+  UserType userType = 3;
 }
