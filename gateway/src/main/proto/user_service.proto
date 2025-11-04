@@ -9,7 +9,8 @@ option java_package = "com.metrocarpool.user.proto";
 option java_outer_classname = "UserProto";
 
 service UserService {
-  rpc UserSignUpRequest (UserSignUp) returns (SignUpOrLoginResponse);
+  rpc DriverSignUpRequest (DriverSignUp) returns (SignUpOrLoginResponse);
+  rpc RiderSignUpRequest (RiderSignUp) returns (SignUpOrLoginResponse);
   rpc UserLoginRequest (UserLogin) returns (SignUpOrLoginResponse);
 }
 
@@ -18,17 +19,25 @@ enum UserType {
   RIDER = 1;
 }
 
-message UserSignUp {
+message DriverSignUp {
   string username = 1;
   string password = 2;
-  UserType userType = 3;
-  int64 licenseId = 4;
-  google.protobuf.Timestamp createdAt = 5;
+//  UserType userType = 3;
+  int64 licenseId = 3;
+  google.protobuf.Timestamp createdAt = 4;
+}
+
+message RiderSignUp {
+  string username = 1;
+  string password = 2;
+//  UserType userType = 3;
+  google.protobuf.Timestamp createdAt = 3;
 }
 
 message UserLogin {
   string username = 1;
   string password = 2;
+  UserType userType = 3;
 }
 
 message SignUpOrLoginResponse {
