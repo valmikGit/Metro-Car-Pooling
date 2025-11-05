@@ -8,19 +8,20 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
+import org.springframework.kafka.support.Acknowledgment;
 
 import java.time.Instant;
 
 @Service
-@Builder
 public class NotificationService {
     private final Sinks.Many<RiderDriverMatch> riderDriverSink = Sinks.many().multicast().onBackpressureBuffer();
     private final Sinks.Many<DriverRideCompletion> driverCompletionSink = Sinks.many().multicast().onBackpressureBuffer();
     private final Sinks.Many<RiderRideCompletion> riderCompletionSink = Sinks.many().multicast().onBackpressureBuffer();
-
+    
     // 🧠 This will be called by your Kafka listener whenever a new match event arrives.
     @KafkaListener(topics = "rider-driver-match", groupId = "notification-service")
-    public void publishRiderDriverMatch(Long riderId, Long driverId, com.google.protobuf.Timestamp timestamp) {
+    public void publishRiderDriverMatch(Long riderId, Long driverId, 
+    com.google.protobuf.Timestamp timestamp, Acknowledgment ack) {
         RiderDriverMatch match = RiderDriverMatch.newBuilder()
                 .setRiderId(riderId)
                 .setDriverId(driverId)
@@ -28,6 +29,9 @@ public class NotificationService {
                 .build();
 
         riderDriverSink.tryEmitNext(match);
+
+        //manually ACK
+        ack.acknowledge();
     }
 
     // 🔁 This will be called by the gRPC server to stream to clients.
@@ -37,13 +41,16 @@ public class NotificationService {
 
     // 🧠 This will be called by your Kafka listener whenever a new driver ride completion event arrives.
     @KafkaListener(topics = "driver-ride-completion", groupId = "notification-service")
-    public void publishDriverRideCompletion(Long driverId, String message) {
+    public void publishDriverRideCompletion(Long driverId, String message, Acknowledgment ack) {
         DriverRideCompletion completion = DriverRideCompletion.newBuilder()
                         .setDriverId(driverId)
                         .setCompletionMessage(message)
                         .build();
 
         driverCompletionSink.tryEmitNext(completion);
+
+        //manually ACK
+        ack.acknowledge();
     }
 
     // 🔁 This will be called by the gRPC server to stream to clients.
@@ -53,13 +60,16 @@ public class NotificationService {
 
     // 🧠 This will be called by your Kafka listener whenever a new rider ride completion event arrives.
     @KafkaListener(topics = "rider-ride-completion", groupId = "notification-service")
-    public void publishRiderRideCompletion(Long riderId, String message) {
+    public void publishRiderRideCompletion(Long riderId, String message, Acknowledgment ack) {
         RiderRideCompletion completion = RiderRideCompletion.newBuilder()
                 .setRiderId(riderId)
                 .setCompletionMessage(message)
                 .build();
 
         riderCompletionSink.tryEmitNext(completion);
+
+        //manually ACK
+        ack.acknowledge();
     }
 
     // 🔁 This will be called by the gRPC server to stream to clients.
