@@ -8,6 +8,7 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.kafka.support.Acknowledgment;
 
 import java.time.Duration;
 
@@ -18,8 +19,8 @@ public class MatchingService {
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
-    private static final String MATCHING_TOPIC = "rider-driver-match" +
-            "";
+    private static final String MATCHING_TOPIC = "rider-driver-match";
+
     @KafkaListener(topics = "driver-updates", groupId = "matching-service")
     public void driverInfoUpdateCache(Long driverId, String oldStation, String nextStation,
                                       Duration timeToNextStation, Integer availableSeats,
@@ -30,7 +31,9 @@ public class MatchingService {
     @KafkaListener(topics = "rider-requests", groupId = "matching-service")
     public void riderInfoDriverMatchingAlgorithm(Long riderId, String pickUpStation,
                                                  com.google.protobuf.Timestamp arrivalTime,
-                                                 String destinationPlace) {
+                                                 String destinationPlace,
+                                                 Acknowledgment acknowledgment) {
+        acknowledgment.acknowledge();
         // Write the matching algorithm
         // Write the Kafka producer in case of a match
         DriverRiderMatchEvent driverRiderMatchEvent = DriverRiderMatchEvent.newBuilder()

@@ -1,16 +1,15 @@
 package com.metrocarpool.driver.service;
 
 import com.metrocarpool.contracts.proto.DriverLocationEvent;
+import com.metrocarpool.contracts.proto.DriverRideCompletionEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-
-import java.util.HashMap;
+import org.springframework.kafka.support.Acknowledgment;
 import java.util.List;
-import java.util.Map;
 
 @Service
 @Slf4j
@@ -20,6 +19,7 @@ public class DriverService {
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
     private static final String DRIVER_TOPIC = "driver-updates";
+    private static final String RIDE_COMPLETION_TOPIC = "trip-completed";
 
     /**
      * Process the driver info and publish it as an event to Kafka
@@ -42,9 +42,11 @@ public class DriverService {
     }
 
     @KafkaListener(topics = "rider-driver-match", groupId = "matching-service")
-    public void matchFoundUpdateCache(Long driverId, Long riderId, String pickUpStation) {
+    public void matchFoundUpdateCache(Long driverId, Long riderId, String pickUpStation,
+                                      Acknowledgment acknowledgment) {
         // Decrement the availableSeats by 1 for this driverId
         // If availableSeats == 0 => evict from cache
+        acknowledgment.acknowledge();
     }
 
     @Scheduled(fixedRate = 60000)
@@ -59,5 +61,11 @@ public class DriverService {
                 .build();
 
         kafkaTemplate.send(DRIVER_TOPIC, driverLocationEvent);
+
+        DriverRideCompletionEvent driverRideCompletionEvent = DriverRideCompletionEvent.newBuilder()
+                .setDriverId(1)
+                .build();
+
+        kafkaTemplate.send(RIDE_COMPLETION_TOPIC, driverRideCompletionEvent);
     }
 }
