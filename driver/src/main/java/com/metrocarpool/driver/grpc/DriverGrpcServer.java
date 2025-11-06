@@ -21,7 +21,8 @@ public class DriverGrpcServer extends DriverServiceGrpc.DriverServiceImplBase {
             boolean success = driverService.processDriverInfo(
                     request.getDriverId(),
                     request.getRouteStationsList(),
-                    request.getFinalDestination()
+                    request.getFinalDestination(),
+                    request.getAvailableSeats()
             );
 
             // ✅ Build the response

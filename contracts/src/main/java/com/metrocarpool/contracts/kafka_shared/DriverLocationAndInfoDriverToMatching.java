@@ -7,7 +7,7 @@ import java.time.Duration;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class DriverInfoDriverToMatching {
+public class DriverLocationAndInfoDriverToMatching {
     private Long driverId;
     private String oldStation;
     private String nextStation;

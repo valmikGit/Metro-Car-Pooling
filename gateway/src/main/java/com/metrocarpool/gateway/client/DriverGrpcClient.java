@@ -22,6 +22,7 @@ public class DriverGrpcClient {
                 .setDriverId(postDriverDTO.getDriverId())
                 .addAllRouteStations(postDriverDTO.getRouteStations())
                 .setFinalDestination(postDriverDTO.getFinalDestination())
+                .setAvailableSeats(postDriverDTO.getAvailableSeats())
                 .build();
 
         return stub.postDriverInfo(postDriver);

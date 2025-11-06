@@ -13,4 +13,5 @@ public class PostDriverDTO {
     private Long driverId;
     private List<String> routeStations;
     String finalDestination;
+    Integer availableSeats;
 }

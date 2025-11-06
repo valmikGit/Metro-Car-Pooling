@@ -20,4 +20,5 @@ message PostDriver {
   int64 driverId = 1;
   repeated string routeStations = 2;
   string finalDestination = 3;
+  int32 availableSeats = 4;
 }

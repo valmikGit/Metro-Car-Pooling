@@ -2,6 +2,7 @@ package com.metrocarpool.driver.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
@@ -26,13 +27,15 @@ public class DriverService {
      * @param finalDestination Final destination of the driver
      * @return true if published successfully, false otherwise
      */
-    public boolean processDriverInfo(Long driverId, List<String> routeStations, String finalDestination) {
+    public boolean processDriverInfo(Long driverId, List<String> routeStations, String finalDestination,
+                                     Integer availableSeats) {
         try {
             // ✅ Construct the event payload
             Map<String, Object> event = new HashMap<>();
             event.put("driverId", driverId);
             event.put("routeStations", routeStations);
             event.put("finalDestination", finalDestination);
+            event.put("availableSeats", availableSeats);
             event.put("timestamp", System.currentTimeMillis());
 
             // ✅ Publish to Kafka topic
@@ -47,5 +50,11 @@ public class DriverService {
             log.error("❌ Failed to process driver info for ID {}: {}", driverId, e.getMessage());
             return false;
         }
+    }
+
+    @KafkaListener(topics = "match-found", groupId = "matching-service")
+    public void matchFoundUpdateCache(Long driverId, Long riderId, String pickUpStation) {
+        // Decrement the availableSeats by 1 for this driverId
+        // If availableSeats == 0 => evict from cache
     }
 }

@@ -15,12 +15,15 @@ public class MatchingService {
     }
 
     @KafkaListener(topics = "rider-requests", groupId = "matching-service")
-    public void riderInfoDriverMatchingAlgorithm(Long riderId, String pickUpStation, com.google.protobuf.Timestamp arrivalTime, String destinationPlace) {
-        // Push in waiting queue
+    public void riderInfoDriverMatchingAlgorithm(Long riderId, String pickUpStation,
+                                                 com.google.protobuf.Timestamp arrivalTime, String destinationPlace) {
+        // Write the Kafka producer in case of a match
+        // Push the rider in the waiting queue if a driver is currently not available
     }
 
     @Scheduled(cron = "* * * * * *")
-    public void matchingAlgorithm() {
+    public void cronJobMatchingAlgorithm() {
+        // Run this CRON job every second to check whether there is a driver for the riders in the waiting queue
         // Write the Kafka producer logic here after matching
     }
 }
