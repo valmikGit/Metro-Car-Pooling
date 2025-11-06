@@ -15,3 +15,7 @@ spring:
         spring.json.use.type.headers: false
     listener:
       ack-mode: manual
+  data:
+    redis:
+      host: redis # We have assumed that "redis" is a Docker container. We will need to use Docker volumes to make the cache persistent.
+      port: 6379
