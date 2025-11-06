@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package com.metrocarpool.events;
 
+import "google/protobuf/timestamp.proto";
+
 // Optionally define the Java package
 option java_multiple_files = true;
 option java_package = "com.metrocarpool.contracts.proto";
@@ -11,6 +13,6 @@ option java_outer_classname = "RiderRequestDriverEventMessage";
 message RiderRequestDriverEvent {
   int64 riderId = 1;
   string pickUpStation = 2;
-  string arrivalTime = 3;
+  google.protobuf.Timestamp arrivalTime = 3;
   string destinationPlace = 4;
 }
