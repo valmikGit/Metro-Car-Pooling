@@ -3,6 +3,8 @@ package com.metrocarpool.driver.service;
 import com.metrocarpool.contracts.proto.DriverLocationEvent;
 import com.metrocarpool.contracts.proto.DriverLocationEventMessage;
 import com.metrocarpool.contracts.proto.DriverRideCompletionEvent;
+import com.metrocarpool.contracts.proto.DriverRiderMatchEvent;
+import com.google.protobuf.InvalidProtocolBufferException;
 import com.metrocarpool.driver.cache.DriverCache;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,7 +29,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class DriverService {
     // ✅ Inject KafkaTemplate to publish events (assuming Spring Boot Kafka configured)
-    private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final KafkaTemplate<String, byte[]> kafkaTemplate;
 
     // Kafka topics
     private static final String DRIVER_TOPIC = "driver-updates";
@@ -41,6 +43,7 @@ public class DriverService {
     private final RedisTemplate<String, Object> redisTemplateLocationMap;
     private static final String LOCATION_LOCATION_MAP_CACHE_KEY = "location-location-map";
 
+    
 
     // Simulation constants
     private static final double DISTANCE_PER_TICK = 10.0;     // units per cron tick (2 minutes)
@@ -80,22 +83,31 @@ public class DriverService {
     }
 
     @KafkaListener(topics = "rider-driver-match", groupId = "matching-service")
-    public void matchFoundUpdateCache(Long driverId, Long riderId, String pickUpStation,
+    public void matchFoundUpdateCache(byte[] message,
                                       Acknowledgment acknowledgment) {
-        // Acknowledge that you have got the message
-        acknowledgment.acknowledge();
 
-        // Decrement the availableSeats by 1 for this driverId
-        Map<Long, Object> allDriverCacheData = (Map<Long, Object>) redisTemplate.opsForValue().get(DRIVER_CACHE_KEY);
-        DriverCache driverCache = (DriverCache) allDriverCacheData.get(driverId);
-        Integer currentAvailableSeats = driverCache.getAvailableSeats();
-        currentAvailableSeats = currentAvailableSeats - 1;
+        try{
+            DriverRiderMatchEvent  event = DriverRiderMatchEvent.parseFrom(message);
+            Long driverId = event.getDriverId();
+            Long riderId = event.getRiderId();
+            String pickUpStation = event.getPickUpStation();
+            // Acknowledge that you have got the message
+            acknowledgment.acknowledge();
+            // Decrement the availableSeats by 1 for this driverId
+            Map<Long, Object> allDriverCacheData = (Map<Long, Object>) redisTemplate.opsForValue().get(DRIVER_CACHE_KEY);
+            DriverCache driverCache = (DriverCache) allDriverCacheData.get(driverId);
+            Integer currentAvailableSeats = driverCache.getAvailableSeats();
+            currentAvailableSeats = currentAvailableSeats - 1;
 
-        // If availableSeats == 0 => evict from cache
-        if (currentAvailableSeats == 0) {
-            allDriverCacheData.remove(driverId);
+            // If availableSeats == 0 => evict from cache
+            if (currentAvailableSeats == 0) {
+                allDriverCacheData.remove(driverId);
+            }
+            redisTemplate.opsForValue().set(DRIVER_CACHE_KEY, allDriverCacheData);
+        }catch (InvalidProtocolBufferException e){
+            log.error("❌ Failed to parse RiderDriverMatchEvent protobuf message", e);
         }
-        redisTemplate.opsForValue().set(DRIVER_CACHE_KEY, allDriverCacheData);
+        
     }
 
    /**
@@ -165,7 +177,7 @@ public class DriverService {
     /**
      * Process one driver's tick: decrement distance, advance route nodes if needed, update times,
      * compute next metro station and emit Kafka event.
-     *
+     * @param driverId 
      * @return true if driver should be evicted (reached final destination)
      */
     private boolean processSingleDriverTick(
@@ -224,10 +236,10 @@ public class DriverService {
                 if (prevPlace != null && prevPlace.equals(cache.getFinalDestination())) {
                     // We reached final destination during this tick
                     log.info("Driver reached final destination: driverId={}, finalDest={}", driverId, prevPlace);
-                    kafkaTemplate.send(RIDE_COMPLETION_TOPIC, DriverRideCompletionEvent.newBuilder()
+                    DriverRideCompletionEvent event = DriverRideCompletionEvent.newBuilder()
                             .setDriverId(driverId)
-                            .build()
-                    );
+                            .build();
+                    kafkaTemplate.send(RIDE_COMPLETION_TOPIC, driverId.toString(), event.toByteArray());
                     return true; // evict driver
                 }
 
@@ -327,7 +339,7 @@ public class DriverService {
                 .build();
 
         // send with key driverId.toString()
-        kafkaTemplate.send(DRIVER_TOPIC, driverId.toString(), event);
+        kafkaTemplate.send(DRIVER_TOPIC, driverId.toString(), event.toByteArray());
         log.debug("Published driver location event for driver {}: oldStation={}, nextStation={}, tts={}s", driverId, oldStationForEvent, nextStationForEvent, timeToNextStationSec);
 
         return false; // not evicted
