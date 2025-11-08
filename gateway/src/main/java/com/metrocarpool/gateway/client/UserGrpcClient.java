@@ -2,10 +2,8 @@ package com.metrocarpool.gateway.client;
 
 import com.metrocarpool.gateway.dto.DriverSignUpRequestDTO;
 import com.metrocarpool.gateway.dto.RiderSignUpRequestDTO;
-import com.metrocarpool.user.proto.DriverSignUp;
-import com.metrocarpool.user.proto.RiderSignUp;
-import com.metrocarpool.user.proto.SignUpOrLoginResponse;
-import com.metrocarpool.user.proto.UserServiceGrpc;
+import com.metrocarpool.gateway.dto.UserLoginDTO;
+import com.metrocarpool.user.proto.*;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import org.springframework.stereotype.Component;
@@ -36,5 +34,23 @@ public class UserGrpcClient {
                 .build();
 
         return stub.riderSignUpRequest(riderSignUp);
+    }
+
+    public SignUpOrLoginResponse DriverLoginReq(UserLoginDTO userLoginDTO) {
+        DriverLogin driverLogin = DriverLogin.newBuilder()
+                .setUsername(userLoginDTO.getUsername())
+                .setPassword(userLoginDTO.getPassword())
+                .build();
+
+        return stub.driverLoginRequest(driverLogin);
+    }
+
+    public SignUpOrLoginResponse RiderLoginReq(UserLoginDTO userLoginDTO) {
+        RiderLogin riderLogin = RiderLogin.newBuilder()
+                .setUsername(userLoginDTO.getUsername())
+                .setPassword(userLoginDTO.getPassword())
+                .build();
+
+        return stub.riderLoginRequest(riderLogin);
     }
 }
