@@ -1,17 +1,3 @@
 spring:
   application:
     name: user
-  kafka:
-    bootstrap-servers: localhost:9092
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-    consumer:
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      group-id: user-service
-      # Recommended property for JSON Deserialization when using Protobuf
-      properties:
-        spring.json.use.type.headers: false
-    listener:
-      ack-mode: manual

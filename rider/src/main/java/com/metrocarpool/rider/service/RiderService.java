@@ -15,7 +15,7 @@ import java.util.Map;
 @Slf4j
 public class RiderService {
     // ✅ Inject KafkaTemplate to publish events (assuming Spring Boot Kafka configured)
-    private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final KafkaTemplate<String, byte[]> kafkaTemplate;
 
     private static final String RIDER_TOPIC = "rider-requests";
 
@@ -35,11 +35,11 @@ public class RiderService {
             RiderRequestDriverEvent riderRequestDriverEvent = RiderRequestDriverEvent.newBuilder()
                     .setRiderId(riderId)
                     .setPickUpStation(pickUpStation)
-                    .setDestinationPlace(destinationPlace)
                     .setArrivalTime(arrivalTime)
+                    .setDestinationPlace(destinationPlace)
                     .build();
 
-            kafkaTemplate.send(RIDER_TOPIC, riderRequestDriverEvent);
+            kafkaTemplate.send(RIDER_TOPIC, riderRequestDriverEvent.toByteArray());
 
             log.info("🚗 Published rider event for ID {} to topic '{}': {}", riderId, RIDER_TOPIC, riderRequestDriverEvent);
             return true;
