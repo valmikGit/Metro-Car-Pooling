@@ -1,12 +1,12 @@
 package com.metrocarpool.driver.service;
 
 import com.metrocarpool.contracts.proto.DriverLocationEvent;
-import com.metrocarpool.contracts.proto.DriverLocationEventMessage;
 import com.metrocarpool.contracts.proto.DriverRideCompletionEvent;
 import com.metrocarpool.contracts.proto.DriverRiderMatchEvent;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.metrocarpool.driver.cache.DriverCache;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -18,7 +18,6 @@ import org.springframework.kafka.support.Acknowledgment;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.Objects;
@@ -31,9 +30,11 @@ public class DriverService {
     // ✅ Inject KafkaTemplate to publish events (assuming Spring Boot Kafka configured)
     private final KafkaTemplate<String, byte[]> kafkaTemplate;
 
-    // Kafka topics
-    private static final String DRIVER_TOPIC = "driver-updates";
-    private static final String RIDE_COMPLETION_TOPIC = "trip-completed";
+    @Value("${kafka.topics.driver-location-topic}")
+    private String DRIVER_TOPIC;
+
+    @Value("${kafka.topics.ride-completion-topic}")
+    private String RIDE_COMPLETION_TOPIC;
 
     // Redis Cache top level key
     private final RedisTemplate<String, Object> redisTemplate;
@@ -42,8 +43,6 @@ public class DriverService {
     private static final String NEARBY_STATIONS_CACHE_KEY = "nearby-stations";
     private final RedisTemplate<String, Object> redisTemplateLocationMap;
     private static final String LOCATION_LOCATION_MAP_CACHE_KEY = "location-location-map";
-
-    
 
     // Simulation constants
     private static final double DISTANCE_PER_TICK = 10.0;     // units per cron tick (2 minutes)

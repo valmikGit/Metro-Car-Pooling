@@ -19,3 +19,7 @@ spring:
     redis:
       host: redis
       port: 6379
+kafka:
+  topics:
+    driver-location-topic: driver-updates
+    ride-completion-topic: trip-completed
