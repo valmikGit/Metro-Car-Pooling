@@ -18,48 +18,53 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
-
 @RestController
 @Builder
 @RequestMapping("/api/user")
 public class UserController {
+
     @Autowired
     private UserGrpcClient userGrpcClient;
+
     @Autowired
     private JwtUtil jwtUtil;
 
-    @PostMapping(value = "/add-driver")
+    @PostMapping("/add-driver")
     public SignUpOrLoginResponseDTO addDriver(@RequestBody DriverSignUpRequestDTO driverSignUpRequestDTO) {
         return SignUpOrLoginResponseDTO.builder()
                 .STATUS_CODE(userGrpcClient.DriverSignUpReq(driverSignUpRequestDTO).getSTATUSCODE())
                 .build();
     }
 
-    @PostMapping(value = "/add-rider")
+    @PostMapping("/add-rider")
     public SignUpOrLoginResponseDTO addRider(@RequestBody RiderSignUpRequestDTO riderSignUpRequestDTO) {
         return SignUpOrLoginResponseDTO.builder()
                 .STATUS_CODE(userGrpcClient.RiderSignUpReq(riderSignUpRequestDTO).getSTATUSCODE())
                 .build();
     }
 
-    @PostMapping(value = "/login-driver")
+    @PostMapping("/login-driver")
     public ResponseEntity<?> loginDriver(@RequestBody UserLoginDTO userLoginDTO) {
         SignUpOrLoginResponse signUpOrLoginResponse = userGrpcClient.DriverLoginReq(userLoginDTO);
         if (signUpOrLoginResponse.getSTATUSCODE() == 200) {
+            // Generate JWT with "username" claim
             String token = jwtUtil.generateToken(userLoginDTO.getUsername());
             return ResponseEntity.ok(Map.of("token", token));
-        }  else {
+//            return ResponseEntity.ok(signUpOrLoginResponse);
+        } else {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(signUpOrLoginResponse);
         }
     }
 
-    @PostMapping(value = "/login-rider")
+    @PostMapping("/login-rider")
     public ResponseEntity<?> loginRider(@RequestBody UserLoginDTO userLoginDTO) {
         SignUpOrLoginResponse signUpOrLoginResponse = userGrpcClient.RiderLoginReq(userLoginDTO);
         if (signUpOrLoginResponse.getSTATUSCODE() == 200) {
+            // Generate JWT with "username" claim
             String token = jwtUtil.generateToken(userLoginDTO.getUsername());
             return ResponseEntity.ok(Map.of("token", token));
-        }  else {
+//            return ResponseEntity.ok(signUpOrLoginResponse);
+        } else {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(signUpOrLoginResponse);
         }
     }
