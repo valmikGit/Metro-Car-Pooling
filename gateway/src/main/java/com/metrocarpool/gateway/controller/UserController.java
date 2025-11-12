@@ -5,16 +5,14 @@ import com.metrocarpool.gateway.dto.DriverSignUpRequestDTO;
 import com.metrocarpool.gateway.dto.RiderSignUpRequestDTO;
 import com.metrocarpool.gateway.dto.SignUpOrLoginResponseDTO;
 import com.metrocarpool.gateway.dto.UserLoginDTO;
+import com.metrocarpool.gateway.security.JwtConstant;
 import com.metrocarpool.gateway.security.JwtUtil;
 import com.metrocarpool.user.proto.SignUpOrLoginResponse;
 import lombok.Builder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
@@ -49,8 +47,11 @@ public class UserController {
         if (signUpOrLoginResponse.getSTATUSCODE() == 200) {
             // Generate JWT with "username" claim
             String token = jwtUtil.generateToken(userLoginDTO.getUsername());
-            return ResponseEntity.ok(Map.of("token", token));
-//            return ResponseEntity.ok(signUpOrLoginResponse);
+
+            // Return token in both body and Authorization header
+            return ResponseEntity.ok()
+                    .header(JwtConstant.JWT_HEADER, "Bearer " + token)
+                    .body(Map.of("token", token));
         } else {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(signUpOrLoginResponse);
         }
@@ -62,8 +63,11 @@ public class UserController {
         if (signUpOrLoginResponse.getSTATUSCODE() == 200) {
             // Generate JWT with "username" claim
             String token = jwtUtil.generateToken(userLoginDTO.getUsername());
-            return ResponseEntity.ok(Map.of("token", token));
-//            return ResponseEntity.ok(signUpOrLoginResponse);
+
+            // Return token in both body and Authorization header
+            return ResponseEntity.ok()
+                    .header(JwtConstant.JWT_HEADER, "Bearer " + token)
+                    .body(Map.of("token", token));
         } else {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(signUpOrLoginResponse);
         }
