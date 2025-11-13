@@ -26,8 +26,8 @@ kafka:
   topics:
     driver-location-topic: "driver-updates"
     ride-completion-topic: "trip-completed"
-server:
-  port: 8081
+#server:
+#  port: 8081
 eureka:
   client:
     service-url:

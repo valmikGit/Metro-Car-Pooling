@@ -11,7 +11,12 @@ spring:
       secret: MTEwNjIwMjQ0NjE5MTE5MzE4Njg0MTk1MjMxNDQ2MjY3MTk2MTU2MjI4NTk3MzgxOTgxMTgwNzk0Nzg1MTkxNjI0OTE1MDYyMjIxMDI=
 server:
   port: 8081
+
 eureka:
   client:
+    register-with-eureka: true        # ✅ Register the gateway itself
+    fetch-registry: true              # ✅ Fetch registry info for all microservices
     service-url:
-      defaultzone: http://localhost:8761/eureka
+      defaultZone: http://localhost:8761/eureka
+  instance:
+    prefer-ip-address: true           # ✅ Use IP instead of hostname when registering

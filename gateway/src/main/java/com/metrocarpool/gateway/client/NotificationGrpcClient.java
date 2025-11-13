@@ -3,6 +3,9 @@ package com.metrocarpool.gateway.client;
 import com.metrocarpool.notification.proto.*;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cloud.client.ServiceInstance;
+import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
@@ -10,14 +13,32 @@ import java.util.Iterator;
 
 @Component
 public class NotificationGrpcClient {
+
     private final NotificationServiceGrpc.NotificationServiceBlockingStub stub;
 
+    @Autowired
+    private DiscoveryClient discoveryClient;
+
     public NotificationGrpcClient() {
-        ManagedChannel channel = ManagedChannelBuilder
-                .forAddress("notification-service", 9090)
+        // Stub will be created lazily after Eureka discovery
+        this.stub = null;
+    }
+
+    private NotificationServiceGrpc.NotificationServiceBlockingStub getStub() {
+        // Discover the "notification" service instance registered in Eureka
+        ServiceInstance instance = discoveryClient.getInstances("notification")
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Notification service not found in Eureka"));
+
+        String host = instance.getHost();
+        int port = getGrpcPort(instance);
+
+        ManagedChannel channel = ManagedChannelBuilder.forAddress(host, port)
                 .usePlaintext()
                 .build();
-        stub = NotificationServiceGrpc.newBlockingStub(channel);
+
+        return NotificationServiceGrpc.newBlockingStub(channel);
     }
 
     private <T> Flux<T> createReactiveStream(Iterator<T> iterator) {
@@ -31,23 +52,25 @@ public class NotificationGrpcClient {
                         sink.error(e);
                     }
                 })
-                .doFinally(signal -> {
-                    // Cleanup logic when stream is cancelled or completed
-                    // You could log or close gRPC resources here if needed
-                    System.out.println("Stream terminated with signal: " + signal);
-                });
+                .doFinally(signal ->
+                        System.out.println("Stream terminated with signal: " + signal)
+                );
     }
 
     public Flux<RiderDriverMatch> getMatchNotifications(boolean status) {
+        NotificationServiceGrpc.NotificationServiceBlockingStub stub = getStub();
+
         NotificationInitiation request = NotificationInitiation.newBuilder()
                 .setStatus(status)
                 .build();
 
         return createReactiveStream(stub.matchNotificationInitiationPost(request))
-                .share(); // allows multiple subscribers to share one stream
+                .share();
     }
 
     public Flux<DriverRideCompletion> getDriverCompletionNotifications(boolean status) {
+        NotificationServiceGrpc.NotificationServiceBlockingStub stub = getStub();
+
         NotificationInitiation request = NotificationInitiation.newBuilder()
                 .setStatus(status)
                 .build();
@@ -57,6 +80,8 @@ public class NotificationGrpcClient {
     }
 
     public Flux<RiderRideCompletion> getRiderCompletionNotifications(boolean status) {
+        NotificationServiceGrpc.NotificationServiceBlockingStub stub = getStub();
+
         NotificationInitiation request = NotificationInitiation.newBuilder()
                 .setStatus(status)
                 .build();
@@ -65,12 +90,19 @@ public class NotificationGrpcClient {
                 .share();
     }
 
-    public Flux<NotifyRiderDriverLocation>  getDriverLocationForRiderNotifications(boolean status) {
+    public Flux<NotifyRiderDriverLocation> getDriverLocationForRiderNotifications(boolean status) {
+        NotificationServiceGrpc.NotificationServiceBlockingStub stub = getStub();
+
         NotificationInitiation request = NotificationInitiation.newBuilder()
                 .setStatus(status)
                 .build();
 
         return createReactiveStream(stub.driverLocationForRiderNotificationInitiationPost(request))
                 .share();
+    }
+
+    private int getGrpcPort(ServiceInstance instance) {
+        String grpcPort = instance.getMetadata().get("grpc.port");
+        return grpcPort != null ? Integer.parseInt(grpcPort) : 9090;
     }
 }
