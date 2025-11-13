@@ -9,6 +9,7 @@
         <outputRelativeToContentRoot value="true" />
         <module name="contracts" />
         <module name="registry" />
+        <module name="db" />
       </profile>
       <profile name="Annotation profile for metrocarpool" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
@@ -30,6 +31,7 @@
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="contracts" options="-parameters" />
+      <module name="db" options="-parameters" />
       <module name="driver" options="-parameters" />
       <module name="gateway" options="-parameters" />
       <module name="matching" options="-parameters" />
