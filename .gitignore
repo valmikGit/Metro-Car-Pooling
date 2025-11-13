@@ -1,3 +1,5 @@
 .idea/
 poolingenv
-*.csv
+# *.csv
+.vscode/
+.idea/
