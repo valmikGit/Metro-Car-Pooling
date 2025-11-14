@@ -2,13 +2,13 @@ spring:
   application:
     name: driver
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: kafka:9092
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.ByteArraySerializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
     consumer:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.ByteArrayDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
       group-id: driver-service
       # Recommended property for JSON Deserialization when using Protobuf
       properties:
@@ -22,6 +22,9 @@ spring:
   grpc:
     server:
       port: 9090
+  cloud:
+    compatibility-verifier:
+      enabled: false
 
 kafka:
   topics:
@@ -36,7 +39,7 @@ eureka:
     register-with-eureka: true          # ✅ Register this driver service with Eureka
     fetch-registry: true                # ✅ Allow this service to discover others if needed
     service-url:
-      defaultZone: http://localhost:8761/eureka
+      defaultZone: http://registry:8761/eureka
   instance:
     prefer-ip-address: true             # ✅ Use IP address when registering with Eureka
     metadata-map:

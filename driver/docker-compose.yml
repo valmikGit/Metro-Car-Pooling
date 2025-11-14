@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+
+  # ------------------------------------------------------------
+  # REDIS
+  # ------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  # ------------------------------------------------------------
+  # CACHE LOADER
+  # ------------------------------------------------------------
+  cache-loader:
+    platform: linux/amd64
+    image: python:3.10
+    container_name: cache-loader
+    depends_on:
+      - redis
+    working_dir: /app
+    volumes:
+      - ../csv_generation:/data
+      - ./redis_loader:/app
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    command: >
+      sh -c "pip install redis &&
+             python load_cache.py"
+
+  # ------------------------------------------------------------
+  # EUREKA REGISTRY
+  # ------------------------------------------------------------
+  registry:
+    platform: linux/amd64
+    build:
+      context: ..
+      dockerfile: registry/Dockerfile
+    container_name: registry
+    ports:
+      - "8761:8761"
+
+  # ------------------------------------------------------------
+  # ZOOKEEPER
+  # ------------------------------------------------------------
+  zookeeper:
+    platform: linux/amd64
+    image: confluentinc/cp-zookeeper:7.6.1
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+
+  # ------------------------------------------------------------
+  # KAFKA
+  # ------------------------------------------------------------
+  kafka:
+    platform: linux/amd64
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+  # ------------------------------------------------------------
+  # DRIVER SERVICE
+  # ------------------------------------------------------------
+  driver-service:
+    platform: linux/amd64
+    build:
+      context: ..
+      dockerfile: driver/Dockerfile
+    container_name: driver-service
+    depends_on:
+      - redis
+      - cache-loader
+      - kafka
+      - registry
+    ports:
+      - "8085:8081"
+      - "9090:9090"
+    environment:
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://registry:8761/eureka
+
+volumes:
+  redis_data:

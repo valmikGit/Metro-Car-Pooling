@@ -4,6 +4,9 @@ server:
 spring:
   application:
     name: registry
+  cloud:
+    compatibility-verifier:
+      enabled: false
 
 eureka:
   client:

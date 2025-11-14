@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.metrocarpool</groupId>
@@ -10,13 +10,24 @@
     <version>0.0.1-SNAPSHOT</version>
     <packaging>pom</packaging>
 
-    <!-- ✅ Spring Boot parent so all modules inherit consistent plugin & dep versions -->
+    <!-- ✔ Spring Boot parent BOM (handles Kafka, Redis, Security, Actuator etc.) -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
         <version>3.5.7</version>
-        <relativePath/> <!-- Don't look up to a parent pom -->
+        <relativePath/>
     </parent>
+
+    <properties>
+        <java.version>21</java.version>
+
+        <!-- ✔ Spring Cloud (Netflix Eureka, Gateway) -->
+        <spring-cloud.version>2023.0.2</spring-cloud.version>
+
+        <!-- ✔ Your explicit versions -->
+        <grpc.version>1.76.0</grpc.version>
+        <protobuf-java.version>4.32.1</protobuf-java.version>
+    </properties>
 
     <modules>
         <module>contracts</module>
@@ -30,12 +41,9 @@
         <module>user</module>
     </modules>
 
-    <properties>
-        <java.version>21</java.version>
-        <spring-cloud.version>2024.0.0</spring-cloud.version>
-    </properties>
 
-    <!-- ✅ Make Spring Cloud dependencies version-managed -->
+
+    <!-- ✔ Spring Cloud BOM ONLY -->
     <dependencyManagement>
         <dependencies>
             <dependency>

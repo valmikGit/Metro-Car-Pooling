@@ -1,45 +1,29 @@
-# ===========================
-#  Stage 1: Build the JAR
-# ===========================
+# ============================
+# BUILD STAGE
+# ============================
 FROM maven:3.9.9-eclipse-temurin-21 AS builder
 
-# Set working directory inside container
 WORKDIR /app
 
-# Copy the parent pom.xml (for multi-module projects) if applicable
-COPY ../pom.xml ../
+# Copy entire multi-module Maven project FIRST
+COPY . /app
 
-# Copy only this module’s pom.xml first (for dependency caching)
-COPY pom.xml .
+# Set correct protoc classifier for Linux Docker build
+ENV PROTOC_CLASSIFIER=linux-x86_64
 
-# Pre-download dependencies to speed up rebuilds
-RUN mvn dependency:go-offline -B
+# Go offline + build ONLY after project exists
+RUN mvn -Dprotoc.classifier=${PROTOC_CLASSIFIER} dependency:go-offline -B
 
-# Copy source code
-COPY src ./src
+# Build only the driver module (with all dependencies built automatically)
+RUN mvn -Dprotoc.classifier=${PROTOC_CLASSIFIER} -pl driver -am clean package -DskipTests
 
-# Package the application (skip tests for faster build)
-RUN mvn clean package -DskipTests
-
-# ===========================
-#  Stage 2: Run the app
-# ===========================
+# ============================
+# RUNTIME STAGE
+# ============================
 FROM eclipse-temurin:21-jre-jammy
-
-# Set working directory inside runtime container
 WORKDIR /app
 
-# Copy the built JAR from the builder stage
-ARG JAR_FILE=target/*.jar
-COPY --from=builder /app/${JAR_FILE} driver_service.jar
+COPY --from=builder /app/driver/target/*.jar driver_service.jar
 
-# Environment variables (optional, makes configuration explicit)
-ENV SPRING_PROFILES_ACTIVE=default
-ENV EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://registry:8761/eureka
-ENV SPRING_APPLICATION_NAME=driver
-
-# Expose gRPC port (9090) and optional HTTP port (if you ever add actuators or REST endpoints)
-EXPOSE 9090
-
-# Default command to run the Spring Boot application
+EXPOSE 8081 9090
 ENTRYPOINT ["java", "-jar", "driver_service.jar"]

@@ -1,36 +1,18 @@
-# ===========================
-#  Stage 1: Build the JAR
-# ===========================
 FROM maven:3.9.9-eclipse-temurin-21 AS builder
+WORKDIR /build
 
-# Set working directory
-WORKDIR /app
+# Copy parent pom
+COPY pom.xml pom.xml
 
-# Copy the pom.xml and download dependencies (for caching)
-COPY pom.xml ./
-# Optional: copy parent pom if using a multi-module structure
-COPY ../pom.xml ../
+# Copy registry module
+COPY registry/pom.xml registry/pom.xml
+COPY registry/src registry/src
 
-# Copy source code
-COPY src ./src
+# Build only registry module
+RUN mvn -f registry/pom.xml clean package -DskipTests
 
-# Package the application (skip tests for speed)
-RUN mvn clean package -DskipTests
-
-# ===========================
-#  Stage 2: Run the app
-# ===========================
 FROM eclipse-temurin:21-jre-jammy
-
-# Set working directory
 WORKDIR /app
-
-# Copy JAR from builder stage
-ARG JAR_FILE=target/*.jar
-COPY --from=builder /app/${JAR_FILE} registry_service.jar
-
-# ✅ Expose Eureka Server port
+COPY --from=builder /build/registry/target/*.jar registry_service.jar
 EXPOSE 8761
-
-# Default startup command
 ENTRYPOINT ["java", "-jar", "registry_service.jar"]
