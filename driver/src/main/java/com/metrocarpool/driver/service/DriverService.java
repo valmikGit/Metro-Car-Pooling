@@ -18,10 +18,15 @@ import org.springframework.kafka.support.Acknowledgment;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.Objects;
 import java.util.Map;
+
+// Jackson for safe JSON parsing of plain Redis values (Option B)
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.type.TypeReference;
 
 @Service
 @Slf4j
@@ -39,10 +44,16 @@ public class DriverService {
     // Redis Cache top level key
     private final RedisTemplate<String, Object> redisTemplate;
     private static final String DRIVER_CACHE_KEY = "drivers";
+    @SuppressWarnings("unused")
     private final RedisTemplate<String, Object> redisTemplateNearby;
     private static final String NEARBY_STATIONS_CACHE_KEY = "nearby-stations";
+    @SuppressWarnings("unused")
     private final RedisTemplate<String, Object> redisTemplateLocationMap;
     private static final String LOCATION_LOCATION_MAP_CACHE_KEY = "location-location-map";
+
+    // String template + mapper for tolerant reads of plain JSON (no @class)
+    private final RedisTemplate<String, String> redisStringTemplate;
+    private final ObjectMapper objectMapper;
 
     // Simulation constants
     private static final double DISTANCE_PER_TICK = 10.0;     // units per cron tick (2 minutes)
@@ -51,14 +62,29 @@ public class DriverService {
     public boolean processDriverInfo(Long driverId, List<String> routePlaces, String finalDestination,
                                      Integer availableSeats) {
         try {
-            // Update this driver in cache
-            // Use the nearby cache to fetch metro stations
-            Map<String, String> nearbyStationMap = (Map<String, String>) redisTemplateNearby.opsForValue()
-                    .get(NEARBY_STATIONS_CACHE_KEY);
+            // Validate basic inputs early
+            if (driverId == null || routePlaces == null || routePlaces.size() < 2 ||
+                finalDestination == null || finalDestination.isEmpty() ||
+                availableSeats == null || availableSeats <= 0) {
+                log.warn("Invalid driver info: id={}, routeSize={}, dest={}, seats={}",
+                        driverId, routePlaces == null ? null : routePlaces.size(), finalDestination, availableSeats);
+                return false;
+            }
+
+            // Safe reads (tolerant to plain JSON; avoids @class requirement)
+            // Nearby map is not required for initial driver registration; read later during cron
             Map<Long, Object> allDriverCacheData = (Map<Long, Object>) redisTemplate.opsForValue()
                     .get(DRIVER_CACHE_KEY);
-            Map<String, Map<String, Double>> locationLocationMap = (Map<String, Map<String, Double>>) redisTemplateLocationMap
-                    .opsForValue().get(LOCATION_LOCATION_MAP_CACHE_KEY);
+            if (allDriverCacheData == null) {
+                log.error("⚠️ Driver cache not found in Redis. Initializing new cache.");
+                allDriverCacheData = new HashMap<>();
+                redisTemplate.opsForValue().set(DRIVER_CACHE_KEY, allDriverCacheData);
+            }
+            Map<String, Map<String, Double>> locationLocationMap = safeReadLocationMap();
+            if (locationLocationMap == null || locationLocationMap.isEmpty()) {
+                log.warn("Location-Location map missing/empty; cannot compute distances.");
+                return false;
+            }
             // Initialize DriverCache
             DriverCache driverCache = DriverCache.builder()
                     .availableSeats(availableSeats)
@@ -125,22 +151,13 @@ public class DriverService {
         @SuppressWarnings("unchecked")
         Map<Long, DriverCache> allDriverCacheData = (Map<Long, DriverCache>) rawDrivers;
 
-        Object rawLocationMap = redisTemplateLocationMap.opsForValue().get(LOCATION_LOCATION_MAP_CACHE_KEY);
-        if (!(rawLocationMap instanceof Map)) {
-            log.warn("Location map missing or corrupted. Key: {}", LOCATION_LOCATION_MAP_CACHE_KEY);
+        // Tolerant reads (no @class requirement)
+        Map<String, Map<String, Double>> locationLocationMap = safeReadLocationMap();
+        if (locationLocationMap == null || locationLocationMap.isEmpty()) {
+            log.warn("Location map missing or empty. Key: {}", LOCATION_LOCATION_MAP_CACHE_KEY);
             return;
         }
-        @SuppressWarnings("unchecked")
-        Map<String, Map<String, Double>> locationLocationMap = (Map<String, Map<String, Double>>) rawLocationMap;
-
-        Object rawNearbyMap = redisTemplateNearby.opsForValue().get(NEARBY_STATIONS_CACHE_KEY);
-        if (!(rawNearbyMap instanceof Map)) {
-            log.warn("Nearby station map missing or corrupted. Key: {}", NEARBY_STATIONS_CACHE_KEY);
-        }
-        @SuppressWarnings("unchecked")
-        Map<String, String> nearbyStationMap = rawNearbyMap == null
-                ? Collections.emptyMap()
-                : (Map<String, String>) rawNearbyMap;
+        Map<String, String> nearbyStationMap = safeReadNearby();
 
         // Iterate drivers and update
         List<Long> driversToEvict = new ArrayList<>();
@@ -345,6 +362,61 @@ public class DriverService {
     }
 
     // ---------- Helper functions ----------
+
+    // Safe readers that accept plain JSON strings and serializer JSON alike
+    private Map<String, String> safeReadNearby() {
+        try {
+            String json = redisStringTemplate.opsForValue().get(NEARBY_STATIONS_CACHE_KEY);
+            if (json == null || json.isEmpty()) return new HashMap<>();
+            // First parse as generic map to tolerate typed JSON (with "@class")
+            Map<String, Object> raw = objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
+            Map<String, String> result = new HashMap<>();
+            for (Map.Entry<String, Object> e : raw.entrySet()) {
+                if ("@class".equals(e.getKey())) continue;
+                Object v = e.getValue();
+                if (v != null) result.put(e.getKey(), String.valueOf(v));
+            }
+            return result;
+        } catch (Exception e) {
+            log.error("nearby-stations parse failed: {}", e.getMessage());
+            return new HashMap<>();
+        }
+    }
+
+    private Map<String, Map<String, Double>> safeReadLocationMap() {
+        try {
+            String json = redisStringTemplate.opsForValue().get(LOCATION_LOCATION_MAP_CACHE_KEY);
+            if (json == null || json.isEmpty()) return new HashMap<>();
+            Map<String, Object> raw = objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
+            Map<String, Map<String, Double>> result = new HashMap<>();
+            for (Map.Entry<String, Object> e : raw.entrySet()) {
+                if ("@class".equals(e.getKey())) continue;
+                Object inner = e.getValue();
+                if (inner instanceof Map) {
+                    Map<?, ?> innerMap = (Map<?, ?>) inner;
+                    Map<String, Double> typedInner = new HashMap<>();
+                    for (Map.Entry<?, ?> ie : innerMap.entrySet()) {
+                        String k = String.valueOf(ie.getKey());
+                        Object val = ie.getValue();
+                        if (val instanceof Number) {
+                            typedInner.put(k, ((Number) val).doubleValue());
+                        } else {
+                            try {
+                                typedInner.put(k, Double.parseDouble(String.valueOf(val)));
+                            } catch (NumberFormatException nfe) {
+                                // skip non-numeric
+                            }
+                        }
+                    }
+                    result.put(e.getKey(), typedInner);
+                }
+            }
+            return result;
+        } catch (Exception e) {
+            log.error("location-location-map parse failed: {}", e.getMessage());
+            return new HashMap<>();
+        }
+    }
 
     private int indexOf(List<String> route, String place) {
         if (route == null) return -1;

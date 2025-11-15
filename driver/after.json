@@ -1,0 +1,1 @@
+"{\"@class\":\"java.util.HashMap\",\"101\":{\"availableSeats\":3,\"routePlaces\":[\"A\",\"B\",\"C\"],\"nextPlace\":\"B\",\"timeToNextPlace\":0.0,\"distanceToNextPlace\":\"Infinity\",\"finalDestination\":\"C\",\"lastSeenMetroStation\":\"\"}}"
