@@ -269,7 +269,7 @@ public class DriverService {
                     DriverRideCompletionEvent event = DriverRideCompletionEvent.newBuilder()
                             .setDriverId(driverId)
                             .build();
-                    kafkaTemplate.send(RIDE_COMPLETION_TOPIC, driverId.toString(), event.toByteArray());
+                    kafkaTemplate.send(RIDE_COMPLETION_TOPIC, String.valueOf(driverId), event.toByteArray());
                     return true; // evict driver
                 }
 
@@ -368,8 +368,8 @@ public class DriverService {
                 .setFinalDestination(finalDestination)
                 .build();
 
-        // send with key driverId.toString()
-        kafkaTemplate.send(DRIVER_TOPIC, driverId.toString(), event.toByteArray());
+        // send with key driverId
+        kafkaTemplate.send(DRIVER_TOPIC, String.valueOf(driverId), event.toByteArray());
         log.debug("Published driver location event for driver {}: oldStation={}, nextStation={}, tts={}s",
                 driverId, oldStationForEvent, nextStationForEvent, timeToNextStationSec);
 

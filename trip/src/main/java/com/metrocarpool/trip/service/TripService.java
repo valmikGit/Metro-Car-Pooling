@@ -90,7 +90,7 @@ public class TripService {
                     .setDriverId(driverId)
                     .setEventMessage("Driver Ride Completed")
                     .build();
-            kafkaTemplate.send(DRIVER_RIDE_COMPLETION_TOPIC, driverRideCompletion.toByteArray());
+            kafkaTemplate.send(DRIVER_RIDE_COMPLETION_TOPIC, String.valueOf(driverId) ,driverRideCompletion.toByteArray());
 
             // 2️⃣ Produce Kafka events for all associated riders
             for (TripCache riderTrip : riderList) {
@@ -98,7 +98,7 @@ public class TripService {
                         .setRiderId(riderTrip.getRiderId())
                         .setEventMessage("Rider Ride Completed")
                         .build();
-                kafkaTemplate.send(RIDER_RIDE_COMPLETION_TOPIC, riderRideCompletion.toByteArray());
+                kafkaTemplate.send(RIDER_RIDE_COMPLETION_TOPIC, String.valueOf(riderRideCompletion.getRiderId()), riderRideCompletion.toByteArray());
             }
 
             // 3️⃣ Remove the driver’s record from Redis after completion
@@ -135,15 +135,14 @@ public class TripService {
 
             assert riderList != null;
             for (TripCache riderTrip : riderList) {
-                kafkaTemplate.send(DRIVER_LOCATION_RIDER, DriverLocationForRiderEvent.newBuilder()
+                DriverLocationForRiderEvent event = DriverLocationForRiderEvent.newBuilder()
                         .setDriverId(driverId)
                         .setRiderId(riderTrip.getRiderId())
                         .setTimeToNextStation(timeToNextStation)
                         .setOldStation(oldStation)
                         .setNextStation(nextStation)
-                        .build()
-                        .toByteArray()
-                );
+                        .build();
+                kafkaTemplate.send(DRIVER_LOCATION_RIDER, String.valueOf(event.getDriverId()) ,event.toByteArray());
             }
         } catch (InvalidProtocolBufferException e) {
             log.error("Failed to parse DriverLocationEvent message: {}", e.getMessage());

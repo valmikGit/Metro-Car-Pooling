@@ -222,7 +222,7 @@ public class MatchingService {
                                     .setDriverArrivalTime(driverArrivalTs)
                                     .build();
 
-                            kafkaTemplate.send(MATCHING_TOPIC, event.toByteArray());
+                            kafkaTemplate.send(MATCHING_TOPIC, String.valueOf(riderId) , event.toByteArray());
                             matched = true;
 
                             // remove matched driver from allMatchingCache
@@ -390,7 +390,7 @@ public class MatchingService {
                                 .setPickUpStation(pickUpStation)
                                 .setDriverArrivalTime(driverArrivalTs)
                                 .build();
-                        kafkaTemplate.send(MATCHING_TOPIC, event.toByteArray());
+                        kafkaTemplate.send(MATCHING_TOPIC, String.valueOf(event.getDriverId() + event.getRiderId()), event.toByteArray());
                         matched = true;
 
                         // remove matched driver from allMatchingCache

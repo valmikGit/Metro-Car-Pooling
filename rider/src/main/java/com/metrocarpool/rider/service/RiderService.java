@@ -42,7 +42,7 @@ public class RiderService {
                     .setDestinationPlace(destinationPlace)
                     .build();
 
-            kafkaTemplate.send(RIDER_TOPIC, riderRequestDriverEvent.toByteArray());
+            kafkaTemplate.send(RIDER_TOPIC, riderId.toString(), riderRequestDriverEvent.toByteArray());
 
             log.info("Published rider event for ID {} to topic '{}': {}", riderId, RIDER_TOPIC, riderRequestDriverEvent);
             return true;
