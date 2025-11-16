@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.SendResult;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.kafka.support.Acknowledgment;
@@ -23,6 +24,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Objects;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 // Jackson for safe JSON parsing of plain Redis values (Option B)
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -206,7 +208,7 @@ public class DriverService {
     /**
      * Process one driver's tick: decrement distance, advance route nodes if needed, update times,
      * compute next metro station and emit Kafka event.
-     * @param driverId
+//     * @param driverId
      * @return true if driver should be evicted (reached final destination)
      */
     private boolean processSingleDriverTick(
@@ -270,7 +272,16 @@ public class DriverService {
                     DriverRideCompletionEvent event = DriverRideCompletionEvent.newBuilder()
                             .setDriverId(driverId)
                             .build();
-                    kafkaTemplate.send(RIDE_COMPLETION_TOPIC, String.valueOf(driverId), event.toByteArray());
+
+                    CompletableFuture<SendResult<String, byte[]>> future = kafkaTemplate.send(RIDE_COMPLETION_TOPIC,
+                            String.valueOf(driverId), event.toByteArray());
+                    future.thenAccept(result -> {
+                        log.debug("Event = {} delivered to {}", event, result.getRecordMetadata().topic());
+                    }).exceptionally(ex -> {
+                        log.error("Event failed. Error message = {}", ex.getMessage());
+                        // Optional: retry, put into Redis dead-letter queue
+                        return null;
+                    });
                     return true; // evict driver
                 }
 
@@ -370,11 +381,20 @@ public class DriverService {
                     .setFinalDestination(finalDestination)
                     .build();
 
-        // send with key driverId
-        kafkaTemplate.send(DRIVER_TOPIC, String.valueOf(driverId), event.toByteArray());
-        log.debug("Published driver location event for driver {}: oldStation={}, nextStation={}, tts={}s",
-                driverId, oldStationForEvent, nextStationForEvent, timeToNextStationSec);
+            // send with key driverId
+            CompletableFuture<SendResult<String, byte[]>> future = kafkaTemplate.send(DRIVER_TOPIC,
+                    String.valueOf(driverId), event.toByteArray());
+            future.thenAccept(result -> {
+                log.debug("Event = {} delivered to {}", event, result.getRecordMetadata().topic());
+            }).exceptionally(ex -> {
+                log.error("Event failed. Error message = {}", ex.getMessage());
+                // Optional: retry, put into Redis dead-letter queue
+                return null;
+            });
+            log.debug("Published driver location event for driver {}: oldStation={}, nextStation={}, tts={}s",
+                    driverId, oldStationForEvent, nextStationForEvent, timeToNextStationSec);
 
+        }
         return false; // not evicted
     }
 

@@ -5,15 +5,18 @@ import lombok.extern.slf4j.Slf4j;
 import com.metrocarpool.trip.cache.TripCache;
 import com.google.protobuf.InvalidProtocolBufferException;
 import lombok.RequiredArgsConstructor;
+import org.apache.kafka.common.protocol.types.Field;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Service;
 import org.springframework.kafka.support.Acknowledgment;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 @Slf4j
@@ -90,7 +93,15 @@ public class TripService {
                     .setDriverId(driverId)
                     .setEventMessage("Driver Ride Completed")
                     .build();
-            kafkaTemplate.send(DRIVER_RIDE_COMPLETION_TOPIC, String.valueOf(driverId) ,driverRideCompletion.toByteArray());
+            CompletableFuture<SendResult<String, byte[]>> future = kafkaTemplate.send(DRIVER_RIDE_COMPLETION_TOPIC,
+                    String.valueOf(driverId) ,driverRideCompletion.toByteArray());
+            future.thenAccept(result -> {
+                log.debug("Event = {} delivered to {}", driverRideCompletion, result.getRecordMetadata().topic());
+            }).exceptionally(ex -> {
+                log.error("Event failed. Error message = {}", ex.getMessage());
+                // Optional: retry, put into Redis dead-letter queue
+                return null;
+            });
 
             // 2️⃣ Produce Kafka events for all associated riders
             for (TripCache riderTrip : riderList) {
@@ -98,7 +109,15 @@ public class TripService {
                         .setRiderId(riderTrip.getRiderId())
                         .setEventMessage("Rider Ride Completed")
                         .build();
-                kafkaTemplate.send(RIDER_RIDE_COMPLETION_TOPIC, String.valueOf(riderRideCompletion.getRiderId()), riderRideCompletion.toByteArray());
+                CompletableFuture<SendResult<String, byte[]>> future1 = kafkaTemplate.send(RIDER_RIDE_COMPLETION_TOPIC,
+                        String.valueOf(riderRideCompletion.getRiderId()), riderRideCompletion.toByteArray());
+                future1.thenAccept(result -> {
+                    log.debug("Event = {} delivered to {}", riderRideCompletion, result.getRecordMetadata().topic());
+                }).exceptionally(ex -> {
+                    log.error("Event failed. Error message = {}", ex.getMessage());
+                    // Optional: retry, put into Redis dead-letter queue
+                    return null;
+                });
             }
 
             // 3️⃣ Remove the driver’s record from Redis after completion
@@ -142,7 +161,15 @@ public class TripService {
                         .setOldStation(oldStation)
                         .setNextStation(nextStation)
                         .build();
-                kafkaTemplate.send(DRIVER_LOCATION_RIDER, String.valueOf(event.getDriverId()) ,event.toByteArray());
+                CompletableFuture<SendResult<String, byte[]>> future = kafkaTemplate.send(DRIVER_LOCATION_RIDER,
+                        String.valueOf(event.getDriverId()), event.toByteArray());
+                future.thenAccept(result -> {
+                    log.debug("Event = {} delivered to {}", event, result.getRecordMetadata().topic());
+                }).exceptionally(ex -> {
+                    log.error("Event failed. Error message = {}", ex.getMessage());
+                    // Optional: retry, put into Redis dead-letter queue
+                    return null;
+                });
             }
         } catch (InvalidProtocolBufferException e) {
             log.error("Failed to parse DriverLocationEvent message: {}", e.getMessage());

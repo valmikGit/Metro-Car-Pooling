@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.SendResult;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.kafka.support.Acknowledgment;
@@ -26,6 +27,7 @@ import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.Objects;
 import java.util.ArrayList;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 @Slf4j
@@ -222,7 +224,15 @@ public class MatchingService {
                                     .setDriverArrivalTime(driverArrivalTs)
                                     .build();
 
-                            kafkaTemplate.send(MATCHING_TOPIC, String.valueOf(riderId) , event.toByteArray());
+                            CompletableFuture<SendResult<String, byte[]>> future = kafkaTemplate.send(MATCHING_TOPIC,
+                                    String.valueOf(riderId) , event.toByteArray());
+                            future.thenAccept(result -> {
+                                log.debug("Event = {} delivered to {}", event, result.getRecordMetadata().topic());
+                            }).exceptionally(ex -> {
+                                log.error("Event failed. Error message = {}", ex.getMessage());
+                                // Optional: retry, put into Redis dead-letter queue
+                                return null;
+                            });
                             matched = true;
 
                             // remove matched driver from allMatchingCache
@@ -390,7 +400,15 @@ public class MatchingService {
                                 .setPickUpStation(pickUpStation)
                                 .setDriverArrivalTime(driverArrivalTs)
                                 .build();
-                        kafkaTemplate.send(MATCHING_TOPIC, String.valueOf(event.getDriverId() + event.getRiderId()), event.toByteArray());
+                        CompletableFuture<SendResult<String, byte[]>> future = kafkaTemplate.send(MATCHING_TOPIC,
+                                String.valueOf(event.getDriverId() + event.getRiderId()), event.toByteArray());
+                        future.thenAccept(result -> {
+                            log.debug("Event = {} delivered to {}", event, result.getRecordMetadata().topic());
+                        }).exceptionally(ex -> {
+                            log.error("Event failed. Error message = {}", ex.getMessage());
+                            // Optional: retry, put into Redis dead-letter queue
+                            return null;
+                        });
                         matched = true;
 
                         // remove matched driver from allMatchingCache
