@@ -6,12 +6,14 @@ import com.metrocarpool.rider.proto.RiderServiceGrpc;
 import com.metrocarpool.rider.proto.RiderStatusResponse;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.client.ServiceInstance;
 import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.stereotype.Component;
 
 @Component
+@Slf4j
 public class RiderGrpcClient {
 
     private final RiderServiceGrpc.RiderServiceBlockingStub stub;
@@ -20,11 +22,15 @@ public class RiderGrpcClient {
     private DiscoveryClient discoveryClient;
 
     public RiderGrpcClient() {
+        log.info("Reached RiderGrpcClient.RiderGrpcClient.");
+
         // Stub will be created lazily once DiscoveryClient is available
         this.stub = null;
     }
 
     private RiderServiceGrpc.RiderServiceBlockingStub getStub() {
+        log.info("Reached RiderGrpcClient.RiderServiceBlockingStub.");
+
         // Discover the "rider" service instance registered in Eureka
         ServiceInstance instance = discoveryClient.getInstances("rider")
                 .stream()
@@ -42,6 +48,8 @@ public class RiderGrpcClient {
     }
 
     public RiderStatusResponse postRiderInfo(PostRiderDTO postRiderDTO) {
+        log.info("Reached RiderGrpcClient.postRiderInfo.");
+
         // Use the discovered stub
         RiderServiceGrpc.RiderServiceBlockingStub stub = getStub();
 
@@ -56,6 +64,8 @@ public class RiderGrpcClient {
     }
 
     private int getGrpcPort(ServiceInstance instance) {
+        log.info("Reached RiderGrpcClient.getGrpcPort.");
+
         String grpcPort = instance.getMetadata().get("grpc.port");
         return grpcPort != null ? Integer.parseInt(grpcPort) : 9090;
     }

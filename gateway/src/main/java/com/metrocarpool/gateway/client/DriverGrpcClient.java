@@ -6,12 +6,14 @@ import com.metrocarpool.driver.proto.PostDriver;
 import com.metrocarpool.gateway.dto.PostDriverDTO;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.client.ServiceInstance;
 import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.stereotype.Component;
 
 @Component
+@Slf4j
 public class DriverGrpcClient {
 
     private final DriverServiceGrpc.DriverServiceBlockingStub stub;
@@ -25,6 +27,8 @@ public class DriverGrpcClient {
     }
 
     private DriverServiceGrpc.DriverServiceBlockingStub getStub() {
+        log.info("Reached DriverGrpcClient.getStub.");
+
         // Discover driver service from Eureka
         ServiceInstance instance = discoveryClient.getInstances("driver")
                 .stream()
@@ -42,6 +46,8 @@ public class DriverGrpcClient {
     }
 
     public DriverStatusResponse postDriverInfo(PostDriverDTO postDriverDTO) {
+        log.info("Reached DriverGrpcClient.postDriverInfo.");
+
         // Use discovered stub instead of static one
         DriverServiceGrpc.DriverServiceBlockingStub stub = getStub();
 
@@ -56,6 +62,8 @@ public class DriverGrpcClient {
     }
 
     private int getGrpcPort(ServiceInstance instance) {
+        log.info("Reached DriverGrpcClient.getGrpcPort.");
+
         String grpcPort = instance.getMetadata().get("grpc.port");
         return grpcPort != null ? Integer.parseInt(grpcPort) : 9090;
     }

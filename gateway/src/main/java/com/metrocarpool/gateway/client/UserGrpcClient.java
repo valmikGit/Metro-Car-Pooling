@@ -6,12 +6,14 @@ import com.metrocarpool.gateway.dto.UserLoginDTO;
 import com.metrocarpool.user.proto.*;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.client.ServiceInstance;
 import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.stereotype.Component;
 
 @Component
+@Slf4j
 public class UserGrpcClient {
 
     private final UserServiceGrpc.UserServiceBlockingStub stub;
@@ -20,11 +22,14 @@ public class UserGrpcClient {
     private DiscoveryClient discoveryClient;
 
     public UserGrpcClient() {
+        log.info("Reached UserGrpcClient.UserGrpcClient.");
         // Stub will be initialized lazily after service discovery
         this.stub = null;
     }
 
     private UserServiceGrpc.UserServiceBlockingStub getStub() {
+        log.info("Reached UserGrpcClient.UserServiceBlockingStub.");
+
         // Discover the "user" service instance registered in Eureka
         ServiceInstance instance = discoveryClient.getInstances("user")
                 .stream()
@@ -42,6 +47,8 @@ public class UserGrpcClient {
     }
 
     public SignUpOrLoginResponse DriverSignUpReq(DriverSignUpRequestDTO driverSignUpRequestDTO) {
+        log.info("Reached UserGrpcClient.DriverSignUpReq.");
+
         UserServiceGrpc.UserServiceBlockingStub stub = getStub();
 
         DriverSignUp driverSignUp = DriverSignUp.newBuilder()
@@ -54,6 +61,8 @@ public class UserGrpcClient {
     }
 
     public SignUpOrLoginResponse RiderSignUpReq(RiderSignUpRequestDTO riderSignUpRequestDTO) {
+        log.info("Reached UserGrpcClient.RiderSignUpReq.");
+
         UserServiceGrpc.UserServiceBlockingStub stub = getStub();
 
         RiderSignUp riderSignUp = RiderSignUp.newBuilder()
@@ -65,6 +74,8 @@ public class UserGrpcClient {
     }
 
     public SignUpOrLoginResponse DriverLoginReq(UserLoginDTO userLoginDTO) {
+        log.info("Reached UserGrpcClient.DriverLoginReq.");
+
         UserServiceGrpc.UserServiceBlockingStub stub = getStub();
 
         DriverLogin driverLogin = DriverLogin.newBuilder()
@@ -76,6 +87,8 @@ public class UserGrpcClient {
     }
 
     public SignUpOrLoginResponse RiderLoginReq(UserLoginDTO userLoginDTO) {
+        log.info("Reached UserGrpcClient.RiderLoginReq.");
+
         UserServiceGrpc.UserServiceBlockingStub stub = getStub();
 
         RiderLogin riderLogin = RiderLogin.newBuilder()
@@ -87,6 +100,8 @@ public class UserGrpcClient {
     }
 
     private int getGrpcPort(ServiceInstance instance) {
+        log.info("Reached UserGrpcClient.getGrpcPort.");
+
         String grpcPort = instance.getMetadata().get("grpc.port");
         return grpcPort != null ? Integer.parseInt(grpcPort) : 9090;
     }

@@ -20,8 +20,8 @@
         <module name="notification" />
         <module name="trip" />
         <module name="driver" />
-        <module name="user" />
         <module name="rider" />
+        <module name="user" />
         <module name="gateway" />
         <module name="matching" />
       </profile>

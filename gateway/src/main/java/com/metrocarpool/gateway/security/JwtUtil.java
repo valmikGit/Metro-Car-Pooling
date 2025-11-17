@@ -5,6 +5,7 @@ import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PostConstruct;
@@ -17,11 +18,8 @@ import java.util.concurrent.TimeUnit;
  * It uses the SECRET_KEY defined in JwtConstant for signing and verification.
  */
 @Component
+@Slf4j
 public class JwtUtil {
-
-    // Reads the hardcoded secret key from the JwtConstant class.
-    // This bypasses the @Value injection failure you experienced earlier.
-    private final String secret = JwtConstant.SECRET_KEY;
 
     private Key key;
 
@@ -33,8 +31,13 @@ public class JwtUtil {
      * the bean is constructed.
      */
     @PostConstruct
-    public void init(){
+    public void init() {
+        log.info("Reached JwtUtil.init.");
+
         // The secret key must be Base64-decoded and used to initialize an HMAC-SHA key
+        // Reads the hardcoded secret key from the JwtConstant class.
+        // This bypasses the @Value injection failure you experienced earlier.
+        String secret = JwtConstant.SECRET_KEY;
         byte[] keyBytes = Decoders.BASE64.decode(secret);
         this.key = Keys.hmacShaKeyFor(keyBytes);
     }
@@ -47,6 +50,8 @@ public class JwtUtil {
      * @return The signed JWT string.
      */
     public String generateToken(String subject) {
+        log.info("Reached JwtUtil.generateToken.");
+
         long now = System.currentTimeMillis();
         Date issueDate = new Date(now);
         Date expirationDate = new Date(now + EXPIRATION_TIME);
@@ -67,6 +72,8 @@ public class JwtUtil {
      * @param token The JWT string to validate.
      */
     public void validateToken(String token) {
+        log.info("Reached JwtUtil.validateToken.");
+
         try {
             // Parsing the JWS will automatically check the signature and expiration time
             Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);
@@ -83,6 +90,8 @@ public class JwtUtil {
      * @return The claims object (payload) if the token is valid.
      */
     public Claims getClaims(String token) {
+        log.info("Reached JwtUtil.getClaims.");
+
         return Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token).getBody();
     }
 }

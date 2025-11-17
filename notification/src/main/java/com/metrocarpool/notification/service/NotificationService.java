@@ -27,9 +27,11 @@ public class NotificationService {
     @KafkaListener(topics = "rider-driver-match", groupId = "notification-service")
     public void publishRiderDriverMatch(byte[] message, Acknowledgment ack) {
         try{
+            log.info("Reached NotificationService.publishRiderDriverMatch.");
+
             DriverRiderMatchEvent tempEvent = DriverRiderMatchEvent.parseFrom(message);
-            Long riderId = tempEvent.getRiderId();
-            Long driverId = tempEvent.getDriverId();
+            long riderId = tempEvent.getRiderId();
+            long driverId = tempEvent.getDriverId();
             com.google.protobuf.Timestamp timestamp = tempEvent.getDriverArrivalTime();
             RiderDriverMatch match = RiderDriverMatch.newBuilder()
                     .setRiderId(riderId)
@@ -42,13 +44,13 @@ public class NotificationService {
             //manually ACK
             ack.acknowledge();
         } catch (InvalidProtocolBufferException e){
-            log.error("❌ Failed to parse DriverRiderMatchEvent message: {}", e);
+            log.error("Failed to parse DriverRiderMatchEvent message: {}", e.getMessage());
         }
-
     }
 
     // 🔁 This will be called by the gRPC server to stream to clients.
     public Flux<RiderDriverMatch> streamRiderDriverMatches() {
+        log.info("Reached NotificationService.streamRiderDriverMatches.");
         return riderDriverSink.asFlux();
     }
 
@@ -56,8 +58,10 @@ public class NotificationService {
     @KafkaListener(topics = "driver-ride-completion", groupId = "notification-service")
     public void publishDriverRideCompletion(byte[] byteMessage, Acknowledgment ack) {
         try {
+            log.info("Reached NotificationService.publishDriverRideCompletion.");
+
             DriverRideCompletion tempEvent = DriverRideCompletion.parseFrom(byteMessage);
-            Long driverId = tempEvent.getDriverId();
+            long driverId = tempEvent.getDriverId();
             String message = tempEvent.getCompletionMessage();
 
             DriverRideCompletion completion = DriverRideCompletion.newBuilder()
@@ -70,12 +74,13 @@ public class NotificationService {
             //manually ACK
             ack.acknowledge();
         } catch (InvalidProtocolBufferException e) {
-            log.error("❌ Failed to parse DriverRideCompletionEvent message: {}", e);
+            log.error("Failed to parse DriverRideCompletionEvent message: {}", e.getMessage());
         }
     }
 
     // 🔁 This will be called by the gRPC server to stream to clients.
     public Flux<DriverRideCompletion> streamDriverRideCompletions() {
+        log.info("Reached NotificationService.streamDriverRideCompletions.");
         return driverCompletionSink.asFlux();
     }
 
@@ -83,6 +88,8 @@ public class NotificationService {
     @KafkaListener(topics = "rider-ride-completion", groupId = "notification-service")
     public void publishRiderRideCompletion(byte[] byteMessage, Acknowledgment ack) {
         try{
+            log.info("Reached NotificationService.publishRiderRideCompletion.");
+
             RiderRideCompletion tempEvent = RiderRideCompletion.parseFrom(byteMessage);
             long riderId = tempEvent.getRiderId();
             String message = tempEvent.getCompletionMessage();
@@ -96,19 +103,22 @@ public class NotificationService {
             //manually ACK
             ack.acknowledge();
         } catch (InvalidProtocolBufferException e){
-            log.error("❌ Failed to parse RiderRideCompletionEvent message: {}", e);
+            log.error("Failed to parse RiderRideCompletionEvent message: {}", e.getMessage());
         }
 
     }
 
     // 🔁 This will be called by the gRPC server to stream to clients.
     public Flux<RiderRideCompletion> streamRiderRideCompletions() {
+        log.info("Reached NotificationService.streamRiderRideCompletions.");
         return riderCompletionSink.asFlux();
     }
 
     @KafkaListener(topics = "driver-location-rider", groupId = "notification-sevice")
     public void publishDriverLocationForRiderEvent(byte[] byteMessage, Acknowledgment ack) {
         try {
+            log.info("Reached NotificationService.publishDriverLocationForRiderEvent.");
+
             DriverLocationForRiderEvent driverLocationForRiderEvent = DriverLocationForRiderEvent.parseFrom(byteMessage);
             // manually acknowledge the message
             ack.acknowledge();
@@ -121,11 +131,12 @@ public class NotificationService {
                     .build();
             driverLocationForRiderSink.tryEmitNext(notifyRiderDriverLocation);
         } catch (InvalidProtocolBufferException e) {
-            throw new RuntimeException(e);
+            log.error("Failed to parse NotifyRiderDriverLocationEvent message: {}", e.getMessage());
         }
     }
 
     public Flux<NotifyRiderDriverLocation> streamNotifyRiderDriverLocations() {
+        log.info("Reached NotificationService.streamNotifyRiderDriverLocations.");
         return driverLocationForRiderSink.asFlux();
     }
 }

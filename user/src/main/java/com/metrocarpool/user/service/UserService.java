@@ -22,6 +22,8 @@ public class UserService {
 
     public Boolean driverSignUp(String username, String password, Long licenseId){
         try {
+            log.info("Reached UserService.driverSignUp.");
+
             driverRepository.save(
                     DriverEntity.builder()
                     .username(username)
@@ -32,13 +34,15 @@ public class UserService {
             return true;
         }
         catch (Exception e){
-            log.error(e.getMessage());
+            log.error("Error in UserService.driverSignUp = {}", e.getMessage());
             return false;
         }
     }
 
     public Boolean riderSignUp(String username, String password){
         try {
+            log.info("Reached UserService.riderSignUp.");
+
             riderRepository.save(
                     RiderEntity.builder()
                             .username(username)
@@ -48,33 +52,35 @@ public class UserService {
             return true;
         }
         catch (Exception e){
-            log.error(e.getMessage());
+            log.error("Error in UserService.riderSignUp = {}", e.getMessage());
             return false;
         }
     }
 
     public Boolean driverLogin(String username, String password) {
         try {
+            log.info("Reached UserService.driverLogin.");
             DriverEntity driverEntity = driverRepository.findByUsername(username).orElse(null);
             if (driverEntity == null) {
                 return false;
             }
             return password.equals(driverEntity.getPassword());
         } catch (Exception e) {
-            log.error(e.getMessage());
+            log.error("Error in UserService.driverLogin = {}", e.getMessage());
             return false;
         }
     }
 
     public Boolean riderLogin(String username, String password) {
         try {
+            log.info("Reached UserService.riderLogin.");
             RiderEntity riderEntity =  riderRepository.findByUsername(username).orElse(null);
             if (riderEntity == null) {
                 return false;
             }
             return password.equals(riderEntity.getPassword());
         } catch (Exception e) {
-            log.error(e.getMessage());
+            log.error("Error in UserService.riderLogin = {}", e.getMessage());
             return false;
         }
     }

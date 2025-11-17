@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.SendResult;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.kafka.support.Acknowledgment;
@@ -23,6 +24,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Objects;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 // Jackson for safe JSON parsing of plain Redis values (Option B)
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -66,23 +68,25 @@ public class DriverService {
             if (driverId == null || routePlaces == null || routePlaces.size() < 2 ||
                 finalDestination == null || finalDestination.isEmpty() ||
                 availableSeats == null || availableSeats <= 0) {
-                log.warn("Invalid driver info: id={}, routeSize={}, dest={}, seats={}",
+                log.warn("Invalid driver info: id={}, routeSize={}, dest={}, seats={}. Returning false.",
                         driverId, routePlaces == null ? null : routePlaces.size(), finalDestination, availableSeats);
                 return false;
             }
 
+            log.info("Reached DriverService.processDriverInfo with driverId = {}, routePlaces = {}, finalDestination = {}, availableSeats = {}",
+                    driverId, routePlaces, finalDestination, availableSeats);
+
             // Safe reads (tolerant to plain JSON; avoids @class requirement)
             // Nearby map is not required for initial driver registration; read later during cron
-            Map<Long, Object> allDriverCacheData = (Map<Long, Object>) redisTemplate.opsForValue()
-                    .get(DRIVER_CACHE_KEY);
-            if (allDriverCacheData == null) {
-                log.error("⚠️ Driver cache not found in Redis. Initializing new cache.");
+            Object raw = redisTemplate.opsForValue().get(DRIVER_CACHE_KEY);
+            Map<Long, DriverCache> allDriverCacheData = normalizeDriverCache(raw);
+            if (allDriverCacheData.isEmpty()) {
+                log.warn("Driver cache not found or empty; initializing new cache.");
                 allDriverCacheData = new HashMap<>();
-                redisTemplate.opsForValue().set(DRIVER_CACHE_KEY, allDriverCacheData);
             }
             Map<String, Map<String, Double>> locationLocationMap = safeReadLocationMap();
-            if (locationLocationMap == null || locationLocationMap.isEmpty()) {
-                log.warn("Location-Location map missing/empty; cannot compute distances.");
+            if (locationLocationMap.isEmpty()) {
+                log.warn("Location-Location map missing/empty; cannot compute distances. Returning false.");
                 return false;
             }
             // Initialize DriverCache
@@ -102,7 +106,7 @@ public class DriverService {
             redisTemplate.opsForValue().set(DRIVER_CACHE_KEY, allDriverCacheData);
             return true;
         } catch (Exception e) {
-            log.error("❌ Failed to process driver info for ID {}: {}", driverId, e.getMessage());
+            log.error("Failed to process driver info for ID {}: {}. Returning false.", driverId, e.getMessage());
             return false;
         }
     }
@@ -118,19 +122,31 @@ public class DriverService {
             String pickUpStation = event.getPickUpStation();
             // Acknowledge that you have got the message
             acknowledgment.acknowledge();
-            // Decrement the availableSeats by 1 for this driverId
-            Map<Long, Object> allDriverCacheData = (Map<Long, Object>) redisTemplate.opsForValue().get(DRIVER_CACHE_KEY);
-            DriverCache driverCache = (DriverCache) allDriverCacheData.get(driverId);
-            Integer currentAvailableSeats = driverCache.getAvailableSeats();
-            currentAvailableSeats = currentAvailableSeats - 1;
 
-            // If availableSeats == 0 => evict from cache
+            log.info("Reached DriverService.matchFoundUpdateCache.");
+            // Decrement the availableSeats by 1 for this driverId
+            Object raw = redisTemplate.opsForValue().get(DRIVER_CACHE_KEY);
+            Map<Long, DriverCache> allDriverCacheData = normalizeDriverCache(raw);
+            DriverCache driverCache = allDriverCacheData.get(driverId);
+            if (driverCache == null) {
+                log.warn("Driver with ID = {} not found in cache during match update. Returning void.", driverId);
+                return;
+            }
+            int currentAvailableSeats = Optional.ofNullable(driverCache.getAvailableSeats()).orElse(0);
+            currentAvailableSeats = Math.max(0, currentAvailableSeats - 1);
+            driverCache.setAvailableSeats(currentAvailableSeats);
+
+            // If availableSeats == 0 => evict from cache, else write back
             if (currentAvailableSeats == 0) {
-                allDriverCacheData.remove(driverId);
+                log.info("Driver = {}, has 0 available seats.", driverCache);
+//                allDriverCacheData.remove(driverId);
+                allDriverCacheData.put(driverId, driverCache);
+            } else {
+                allDriverCacheData.put(driverId, driverCache);
             }
             redisTemplate.opsForValue().set(DRIVER_CACHE_KEY, allDriverCacheData);
-        }catch (InvalidProtocolBufferException e){
-            log.error("❌ Failed to parse RiderDriverMatchEvent protobuf message", e);
+        } catch (InvalidProtocolBufferException e){
+            log.error("Failed to parse RiderDriverMatchEvent protobuf message", e);
         }
         
     }
@@ -141,19 +157,18 @@ public class DriverService {
     @Scheduled(cron = "0 */2 * * * *")
     public void cronJobDriverLocationSimulation() {
         log.debug("cron tick - driver simulation starting");
-
-        // Read caches from Redis
+        log.info("CRON job ka tick-tick chal raha hai...");
+        // Read caches from Redis and normalize key/value types
         Object rawDrivers = redisTemplate.opsForValue().get(DRIVER_CACHE_KEY);
-        if (!(rawDrivers instanceof Map)) {
-            log.warn("Driver cache not found or not a Map. Key: {}", DRIVER_CACHE_KEY);
+        Map<Long, DriverCache> allDriverCacheData = normalizeDriverCache(rawDrivers);
+        if (allDriverCacheData.isEmpty()) {
+            log.warn("Driver cache empty or unreadable. Key: {}", DRIVER_CACHE_KEY);
             return;
         }
-        @SuppressWarnings("unchecked")
-        Map<Long, DriverCache> allDriverCacheData = (Map<Long, DriverCache>) rawDrivers;
 
         // Tolerant reads (no @class requirement)
         Map<String, Map<String, Double>> locationLocationMap = safeReadLocationMap();
-        if (locationLocationMap == null || locationLocationMap.isEmpty()) {
+        if (locationLocationMap.isEmpty()) {
             log.warn("Location map missing or empty. Key: {}", LOCATION_LOCATION_MAP_CACHE_KEY);
             return;
         }
@@ -193,7 +208,7 @@ public class DriverService {
     /**
      * Process one driver's tick: decrement distance, advance route nodes if needed, update times,
      * compute next metro station and emit Kafka event.
-     * @param driverId 
+//     * @param driverId
      * @return true if driver should be evicted (reached final destination)
      */
     private boolean processSingleDriverTick(
@@ -203,6 +218,8 @@ public class DriverService {
             Map<String, String> nearbyStationMap) {
 
         if (cache == null) return true;
+
+        log.info("Reached DriverService.processSingleDriverTick for driver ID = {}", driverId);
 
         // Defensive checks
         List<String> route = cache.getRoutePlaces();
@@ -255,7 +272,16 @@ public class DriverService {
                     DriverRideCompletionEvent event = DriverRideCompletionEvent.newBuilder()
                             .setDriverId(driverId)
                             .build();
-                    kafkaTemplate.send(RIDE_COMPLETION_TOPIC, driverId.toString(), event.toByteArray());
+
+                    CompletableFuture<SendResult<String, byte[]>> future = kafkaTemplate.send(RIDE_COMPLETION_TOPIC,
+                            String.valueOf(driverId), event.toByteArray());
+                    future.thenAccept(result -> {
+                        log.debug("Event = {} delivered to {}", event, result.getRecordMetadata().topic());
+                    }).exceptionally(ex -> {
+                        log.error("Event failed. Error message = {}", ex.getMessage());
+                        // Optional: retry, put into Redis dead-letter queue
+                        return null;
+                    });
                     return true; // evict driver
                 }
 
@@ -344,20 +370,31 @@ public class DriverService {
         int availableSeats = Optional.ofNullable(cache.getAvailableSeats()).orElse(0);
         String finalDestination = Optional.ofNullable(cache.getFinalDestination()).orElse("");
 
-        // emit Kafka event
-        DriverLocationEvent event = DriverLocationEvent.newBuilder()
-                .setDriverId(driverId)
-                .setOldStation(oldStationForEvent)
-                .setNextStation(nextStationForEvent)
-                .setTimeToNextStation(timeToNextStationSec)
-                .setAvailableSeats(availableSeats)
-                .setFinalDestination(finalDestination)
-                .build();
+        if (availableSeats > 0) {
+            // emit Kafka event
+            DriverLocationEvent event = DriverLocationEvent.newBuilder()
+                    .setDriverId(driverId)
+                    .setOldStation(oldStationForEvent)
+                    .setNextStation(nextStationForEvent)
+                    .setTimeToNextStation(timeToNextStationSec)
+                    .setAvailableSeats(availableSeats)
+                    .setFinalDestination(finalDestination)
+                    .build();
 
-        // send with key driverId.toString()
-        kafkaTemplate.send(DRIVER_TOPIC, driverId.toString(), event.toByteArray());
-        log.debug("Published driver location event for driver {}: oldStation={}, nextStation={}, tts={}s", driverId, oldStationForEvent, nextStationForEvent, timeToNextStationSec);
+            // send with key driverId
+            CompletableFuture<SendResult<String, byte[]>> future = kafkaTemplate.send(DRIVER_TOPIC,
+                    String.valueOf(driverId), event.toByteArray());
+            future.thenAccept(result -> {
+                log.debug("Event = {} delivered to {}", event, result.getRecordMetadata().topic());
+            }).exceptionally(ex -> {
+                log.error("Event failed. Error message = {}", ex.getMessage());
+                // Optional: retry, put into Redis dead-letter queue
+                return null;
+            });
+            log.debug("Published driver location event for driver {}: oldStation={}, nextStation={}, tts={}s",
+                    driverId, oldStationForEvent, nextStationForEvent, timeToNextStationSec);
 
+        }
         return false; // not evicted
     }
 
@@ -366,6 +403,7 @@ public class DriverService {
     // Safe readers that accept plain JSON strings and serializer JSON alike
     private Map<String, String> safeReadNearby() {
         try {
+            log.info("Reached DriverService.safeReadNearby.");
             String json = redisStringTemplate.opsForValue().get(NEARBY_STATIONS_CACHE_KEY);
             if (json == null || json.isEmpty()) return new HashMap<>();
             // First parse as generic map to tolerate typed JSON (with "@class")
@@ -385,6 +423,7 @@ public class DriverService {
 
     private Map<String, Map<String, Double>> safeReadLocationMap() {
         try {
+            log.info("Reached DriverService.safeReadLocationMap.");
             String json = redisStringTemplate.opsForValue().get(LOCATION_LOCATION_MAP_CACHE_KEY);
             if (json == null || json.isEmpty()) return new HashMap<>();
             Map<String, Object> raw = objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
@@ -419,6 +458,7 @@ public class DriverService {
     }
 
     private int indexOf(List<String> route, String place) {
+        log.info("Reached DriverService.indexOf");
         if (route == null) return -1;
         for (int i = 0; i < route.size(); i++) {
             if (Objects.equals(route.get(i), place)) return i;
@@ -431,6 +471,7 @@ public class DriverService {
      * Tries symmetric lookup: map[a].get(b) or map[b].get(a). Returns Double.POSITIVE_INFINITY if unknown.
      */
     private double getDistanceBetween(String a, String b, Map<String, Map<String, Double>> locationLocationMap) {
+        log.info("Reached DriverService.getDistanceBetween.");
         if (a == null || b == null) return Double.POSITIVE_INFINITY;
         if (Objects.equals(a, b)) return 0.0;
         Map<String, Double> inner = locationLocationMap.get(a);
@@ -449,6 +490,7 @@ public class DriverService {
      * Returns Duration in seconds computed as ceil(distance / DISTANCE_PER_TICK * SECONDS_PER_TICK).
      */
     private Duration computeDurationFromDistance(double distance) {
+        log.info("Reached DriverService.computeDurationFromDistance.");
         if (Double.isInfinite(distance) || distance <= 0) {
             return Duration.ZERO;
         }
@@ -463,6 +505,7 @@ public class DriverService {
      * Returns stationId or empty string if not found.
      */
     private String findNextMetroStationInRoute(String currentNextPlace, List<String> routePlaces, Map<String, String> nearbyStationMap) {
+        log.info("Reached DriverService.findNextMetroStationInRoute.");
         if (routePlaces == null || routePlaces.isEmpty()) return "";
         int startIdx = indexOf(routePlaces, currentNextPlace);
         if (startIdx == -1) startIdx = 0;
@@ -485,6 +528,7 @@ public class DriverService {
                                                      Map<String, Map<String, Double>> locationLocationMap,
                                                      Map<String, String> nearbyStationMap,
                                                      double distanceCovered) {
+        log.info("Reached DriverService.detectPassedMetroStationDuringTick.");
         if (cache == null) return "";
         List<String> route = cache.getRoutePlaces();
         if (route == null || route.isEmpty()) return "";
@@ -518,6 +562,7 @@ public class DriverService {
                                             String nextStationId,
                                             Map<String, Map<String, Double>> locationLocationMap,
                                             Map<String, String> nearbyStationMap) {
+        log.info("Reached DriverService.computeTimeToNextStationSec.");
         if (cache == null || nextStationId == null || nextStationId.isEmpty()) return 0;
 
         // We must find the first place on route that maps to nextStationId, then compute distance from
@@ -563,5 +608,44 @@ public class DriverService {
         // convert to seconds: time = ceil(totalDistance / DISTANCE_PER_TICK * SECONDS_PER_TICK)
         long secs = (long) Math.ceil((totalDistance / DISTANCE_PER_TICK) * SECONDS_PER_TICK);
         return (int) secs;
+    }
+
+    // ---------- Normalization helpers ----------
+
+    /**
+     * Normalize the Redis 'drivers' value to a Map<Long, DriverCache> regardless of stored key/value shapes.
+     * Accepts keys as Long/Integer/String and values as DriverCache or Map (convertible to DriverCache).
+     */
+    private Map<Long, DriverCache> normalizeDriverCache(Object raw) {
+        log.info("Reached DriverService.normalizeDriverCache.");
+        Map<Long, DriverCache> out = new HashMap<>();
+        if (!(raw instanceof Map<?, ?> rawMap)) return out;
+        for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
+            Long id = parseLongKey(entry.getKey());
+            if (id == null) continue;
+            Object val = entry.getValue();
+            DriverCache cache = null;
+            if (val instanceof DriverCache) {
+                cache = (DriverCache) val;
+            } else if (val instanceof Map) {
+                try {
+                    cache = objectMapper.convertValue(val, DriverCache.class);
+                } catch (IllegalArgumentException ex) {
+                    log.warn("Failed to convert driver cache for id {}: {}", id, ex.getMessage());
+                }
+            }
+            if (cache != null) out.put(id, cache);
+        }
+        return out;
+    }
+
+    private Long parseLongKey(Object key) {
+        log.info("Reached DriverService.parseLongKey.");
+        if (key instanceof Long l) return l;
+        if (key instanceof Integer i) return i.longValue();
+        if (key instanceof String s) {
+            try { return Long.parseLong(s); } catch (NumberFormatException ignored) {}
+        }
+        return null;
     }
 }

@@ -7,11 +7,13 @@ import com.metrocarpool.rider.service.RiderService;
 import io.grpc.stub.StreamObserver;
 import lombok.Builder;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.grpc.server.service.GrpcService;
 
 @GrpcService
 @RequiredArgsConstructor
+@Slf4j
 public class RiderGrpcServer extends RiderServiceGrpc.RiderServiceImplBase {
 
     private final RiderService riderService;
@@ -19,6 +21,8 @@ public class RiderGrpcServer extends RiderServiceGrpc.RiderServiceImplBase {
     @Override
     public void postRiderInfo(PostRider request, StreamObserver<RiderStatusResponse> responseObserver) {
         try {
+            log.info("Reached RiderGrpcServer.postRiderInfo.");
+
             // ✅ Call the business logic
             boolean success = riderService.processRiderInfo(
                     request.getRiderId(),
@@ -36,6 +40,7 @@ public class RiderGrpcServer extends RiderServiceGrpc.RiderServiceImplBase {
             responseObserver.onNext(response);
             responseObserver.onCompleted();
         } catch (Exception e) {
+            log.error("Error in RiderGrpcServer.postRiderInfo = {}", e.getMessage());
             // ❌ Handle any exception gracefully
             responseObserver.onError(e);
         }

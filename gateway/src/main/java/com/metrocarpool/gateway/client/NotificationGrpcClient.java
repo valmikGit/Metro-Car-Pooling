@@ -3,6 +3,7 @@ package com.metrocarpool.gateway.client;
 import com.metrocarpool.notification.proto.*;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.client.ServiceInstance;
 import org.springframework.cloud.client.discovery.DiscoveryClient;
@@ -12,6 +13,7 @@ import reactor.core.publisher.Flux;
 import java.util.Iterator;
 
 @Component
+@Slf4j
 public class NotificationGrpcClient {
 
     private final NotificationServiceGrpc.NotificationServiceBlockingStub stub;
@@ -20,11 +22,14 @@ public class NotificationGrpcClient {
     private DiscoveryClient discoveryClient;
 
     public NotificationGrpcClient() {
+        log.info("Reached NotificationGrpcClient.NotificationGrpcClient.");
+
         // Stub will be created lazily after Eureka discovery
         this.stub = null;
     }
 
     private NotificationServiceGrpc.NotificationServiceBlockingStub getStub() {
+        log.info("Reached NotificationGrpcClient.NotificationServiceBlockingStub.");
         // Discover the "notification" service instance registered in Eureka
         ServiceInstance instance = discoveryClient.getInstances("notification")
                 .stream()
@@ -42,6 +47,7 @@ public class NotificationGrpcClient {
     }
 
     private <T> Flux<T> createReactiveStream(Iterator<T> iterator) {
+        log.info("NotificationGrpcClient.createReactiveStream.");
         return Flux.<T>create(sink -> {
                     try {
                         while (iterator.hasNext() && !sink.isCancelled()) {
@@ -58,6 +64,7 @@ public class NotificationGrpcClient {
     }
 
     public Flux<RiderDriverMatch> getMatchNotifications(boolean status) {
+        log.info("NotificationGrpcClient.getMatchNotifications.");
         NotificationServiceGrpc.NotificationServiceBlockingStub stub = getStub();
 
         NotificationInitiation request = NotificationInitiation.newBuilder()
@@ -69,6 +76,7 @@ public class NotificationGrpcClient {
     }
 
     public Flux<DriverRideCompletion> getDriverCompletionNotifications(boolean status) {
+        log.info("NotificationGrpcClient.getDriverCompletionNotifications.");
         NotificationServiceGrpc.NotificationServiceBlockingStub stub = getStub();
 
         NotificationInitiation request = NotificationInitiation.newBuilder()
@@ -80,6 +88,7 @@ public class NotificationGrpcClient {
     }
 
     public Flux<RiderRideCompletion> getRiderCompletionNotifications(boolean status) {
+        log.info("NotificationGrpcClient.getRiderCompletionNotifications.");
         NotificationServiceGrpc.NotificationServiceBlockingStub stub = getStub();
 
         NotificationInitiation request = NotificationInitiation.newBuilder()
@@ -91,6 +100,7 @@ public class NotificationGrpcClient {
     }
 
     public Flux<NotifyRiderDriverLocation> getDriverLocationForRiderNotifications(boolean status) {
+        log.info("NotificationGrpcClient.getDriverLocationForRiderNotifications.");
         NotificationServiceGrpc.NotificationServiceBlockingStub stub = getStub();
 
         NotificationInitiation request = NotificationInitiation.newBuilder()
@@ -102,6 +112,7 @@ public class NotificationGrpcClient {
     }
 
     private int getGrpcPort(ServiceInstance instance) {
+        log.info("NotificationGrpcClient.getGrpcPort.");
         String grpcPort = instance.getMetadata().get("grpc.port");
         return grpcPort != null ? Integer.parseInt(grpcPort) : 9090;
     }
