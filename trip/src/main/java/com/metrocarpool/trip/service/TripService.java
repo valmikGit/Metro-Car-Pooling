@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import com.metrocarpool.trip.cache.TripCache;
 import com.google.protobuf.InvalidProtocolBufferException;
 import lombok.RequiredArgsConstructor;
-import org.apache.kafka.common.protocol.types.Field;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -54,6 +53,9 @@ public class TripService {
                     .pickUpStation(pickUpStation)
                     .build()
             );
+
+            log.info("Trip: Rider = {} is now travelling with Driver = {}", riderId, driverId);
+
             redisTemplate.opsForValue().set(TRIP_CACHE_KEY, allTripCacheData);
         } catch (InvalidProtocolBufferException e){
             log.error("Failed to parse DriverRiderMatchEvent message: {}", e.getMessage());
@@ -93,6 +95,9 @@ public class TripService {
                     .setDriverId(driverId)
                     .setEventMessage("Driver Ride Completed")
                     .build();
+
+            log.info("Trip completion: Driver = {}", driverId);
+
             CompletableFuture<SendResult<String, byte[]>> future = kafkaTemplate.send(DRIVER_RIDE_COMPLETION_TOPIC,
                     String.valueOf(driverId) ,driverRideCompletion.toByteArray());
             future.thenAccept(result -> {
@@ -109,6 +114,9 @@ public class TripService {
                         .setRiderId(riderTrip.getRiderId())
                         .setEventMessage("Rider Ride Completed")
                         .build();
+
+                log.info("Trip completion: Rider = {}", riderTrip.getRiderId());
+
                 CompletableFuture<SendResult<String, byte[]>> future1 = kafkaTemplate.send(RIDER_RIDE_COMPLETION_TOPIC,
                         String.valueOf(riderRideCompletion.getRiderId()), riderRideCompletion.toByteArray());
                 future1.thenAccept(result -> {
@@ -161,6 +169,9 @@ public class TripService {
                         .setOldStation(oldStation)
                         .setNextStation(nextStation)
                         .build();
+
+                log.info("Driver location: Location = {}", event);
+
                 CompletableFuture<SendResult<String, byte[]>> future = kafkaTemplate.send(DRIVER_LOCATION_RIDER,
                         String.valueOf(event.getDriverId()), event.toByteArray());
                 future.thenAccept(result -> {

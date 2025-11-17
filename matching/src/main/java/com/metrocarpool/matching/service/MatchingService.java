@@ -224,6 +224,8 @@ public class MatchingService {
                                     .setDriverArrivalTime(driverArrivalTs)
                                     .build();
 
+                            log.info("Matching: Rider = {} and driver = {} matched.", riderId, chosenDriver.getDriverId());
+
                             CompletableFuture<SendResult<String, byte[]>> future = kafkaTemplate.send(MATCHING_TOPIC,
                                     String.valueOf(riderId) , event.toByteArray());
                             future.thenAccept(result -> {
@@ -277,13 +279,12 @@ public class MatchingService {
                         .pickUpStation(pickUpStation)
                         .build()
                 );
+                log.info("Rider waiting queue: Rider added to waiting queue.");
                 redisWaitingQueueTemplate.opsForValue().set(MATCHING_WAITING_QUEUE_KEY, riderWaitingQueueCache);
             }
-            
-        }catch (InvalidProtocolBufferException e){
+        } catch (InvalidProtocolBufferException e){
             log.error("Failed to parse RiderRequestDriverEvent protobuf message", e);
         }
-        
     }
 
     @Scheduled(cron = "* * * * * *")
@@ -394,12 +395,17 @@ public class MatchingService {
                         }
                         Timestamp driverArrivalTs = Timestamps.fromMillis(driverArrivalMillis);
 
+                        log.info("Rider waiting queue: Rider popped from waiting queue.");
+
                         DriverRiderMatchEvent event = DriverRiderMatchEvent.newBuilder()
                                 .setDriverId(chosenDriver.getDriverId())
                                 .setRiderId(rider.getRiderId())
                                 .setPickUpStation(pickUpStation)
                                 .setDriverArrivalTime(driverArrivalTs)
                                 .build();
+
+                        log.info("Matching: Rider = {} and driver = {} matched.", rider.getRiderId(), chosenDriver.getDriverId());
+
                         CompletableFuture<SendResult<String, byte[]>> future = kafkaTemplate.send(MATCHING_TOPIC,
                                 String.valueOf(event.getDriverId() + event.getRiderId()), event.toByteArray());
                         future.thenAccept(result -> {
@@ -442,6 +448,7 @@ public class MatchingService {
         // If not matched, push rider back to waiting queue (end of queue)
         if (!matched) {
             riderWaitingQueueCache.add(rider);
+            log.info("Rider waiting queue: Rider added to waiting queue.");
         }
 
         // update waiting queue in redis
