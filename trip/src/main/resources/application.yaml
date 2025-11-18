@@ -42,3 +42,6 @@ eureka:
     prefer-ip-address: true             # ✅ Use IP instead of hostname
     metadata-map:
       grpc.port: 9094                   # ✅ Advertise gRPC port to Eureka
+logstash:
+  host: localhost
+  port: 5044

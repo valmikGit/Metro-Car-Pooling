@@ -44,3 +44,6 @@ eureka:
     prefer-ip-address: true             # ✅ Use IP address when registering with Eureka
     metadata-map:
       grpc.port: 9090                   # ✅ gRPC port metadata for other services to discover
+logstash:
+  host: localhost
+  port: 5044

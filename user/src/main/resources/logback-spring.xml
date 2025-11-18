@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="true">
+    <springProperty scope="context" name="APP_NAME" source="spring.application.name" defaultValue="my-spring-app" />
+    <springProperty scope="context" name="LOGSTASH_HOST" source="logstash.host" defaultValue="localhost" />
+    <springProperty scope="context" name="LOGSTASH_PORT" source="logstash.port" defaultValue="5044" />
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="LOGSTASH" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+        <destination>${LOGSTASH_HOST}:${LOGSTASH_PORT}</destination>
+        <keepAliveDuration>5 minutes</keepAliveDuration>
+        <reconnectionDelay>5000</reconnectionDelay>
+
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <timestamp><timeZone>UTC</timeZone></timestamp>
+                <pattern>
+                    <pattern>
+                        {"application":"${APP_NAME}","level":"%level","logger":"%logger","thread":"%thread","message":"%message","stack_trace":"%ex"}
+                    </pattern>
+                </pattern>
+                <context/>
+                <mdc/>
+            </providers>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="LOGSTASH"/>
+    </root>
+</configuration>
