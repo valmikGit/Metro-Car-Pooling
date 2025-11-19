@@ -1,0 +1,20 @@
+services:
+  rider-service:
+    build:
+      context: ..
+      dockerfile: rider/Dockerfile
+    container_name: rider-service
+    ports:
+      - "8086:8082"
+      - "9093:9093"
+    environment:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      EUREKA_URL: http://registry:8761/eureka
+      LOGSTASH_HOST: logstash
+      LOGSTASH_PORT: 5044
+    networks:
+      - infra_default
+
+networks:
+  infra_default:
+    external: true

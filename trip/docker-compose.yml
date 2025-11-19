@@ -1,23 +1,21 @@
 version: "3.8"
 
 services:
-  driver-service:
+  trip-service:
     build:
       context: ..
-      dockerfile: driver/Dockerfile
-    container_name: driver-service
+      dockerfile: trip/Dockerfile
+    container_name: trip-service
     ports:
-      - "8085:8081"
-      - "9090:9090"
+      - "8087:8083"
+      - "9094:9094"
     environment:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://registry:8761/eureka
+      EUREKA_URL: http://registry:8761/eureka
       LOGSTASH_HOST: logstash
       LOGSTASH_PORT: 5044
-
-    # Link to infrastructure network
     networks:
       - infra_default
 

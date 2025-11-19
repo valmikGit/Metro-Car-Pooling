@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.SendResult;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.kafka.support.Acknowledgment;
@@ -26,6 +27,7 @@ import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.Objects;
 import java.util.ArrayList;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 @Slf4j
@@ -222,7 +224,17 @@ public class MatchingService {
                                     .setDriverArrivalTime(driverArrivalTs)
                                     .build();
 
-                            kafkaTemplate.send(MATCHING_TOPIC, event.toByteArray());
+                            log.info("Matching: Rider = {} and driver = {} matched.", riderId, chosenDriver.getDriverId());
+
+                            CompletableFuture<SendResult<String, byte[]>> future = kafkaTemplate.send(MATCHING_TOPIC,
+                                    String.valueOf(riderId) , event.toByteArray());
+                            future.thenAccept(result -> {
+                                log.debug("Event = {} delivered to {}", event, result.getRecordMetadata().topic());
+                            }).exceptionally(ex -> {
+                                log.error("Event failed. Error message = {}", ex.getMessage());
+                                // Optional: retry, put into Redis dead-letter queue
+                                return null;
+                            });
                             matched = true;
 
                             // remove matched driver from allMatchingCache
@@ -267,13 +279,12 @@ public class MatchingService {
                         .pickUpStation(pickUpStation)
                         .build()
                 );
+                log.info("Rider waiting queue: Rider added to waiting queue.");
                 redisWaitingQueueTemplate.opsForValue().set(MATCHING_WAITING_QUEUE_KEY, riderWaitingQueueCache);
             }
-            
-        }catch (InvalidProtocolBufferException e){
+        } catch (InvalidProtocolBufferException e){
             log.error("Failed to parse RiderRequestDriverEvent protobuf message", e);
         }
-        
     }
 
     @Scheduled(cron = "* * * * * *")
@@ -384,13 +395,26 @@ public class MatchingService {
                         }
                         Timestamp driverArrivalTs = Timestamps.fromMillis(driverArrivalMillis);
 
+                        log.info("Rider waiting queue: Rider popped from waiting queue.");
+
                         DriverRiderMatchEvent event = DriverRiderMatchEvent.newBuilder()
                                 .setDriverId(chosenDriver.getDriverId())
                                 .setRiderId(rider.getRiderId())
                                 .setPickUpStation(pickUpStation)
                                 .setDriverArrivalTime(driverArrivalTs)
                                 .build();
-                        kafkaTemplate.send(MATCHING_TOPIC, event.toByteArray());
+
+                        log.info("Matching: Rider = {} and driver = {} matched.", rider.getRiderId(), chosenDriver.getDriverId());
+
+                        CompletableFuture<SendResult<String, byte[]>> future = kafkaTemplate.send(MATCHING_TOPIC,
+                                String.valueOf(event.getDriverId() + event.getRiderId()), event.toByteArray());
+                        future.thenAccept(result -> {
+                            log.debug("Event = {} delivered to {}", event, result.getRecordMetadata().topic());
+                        }).exceptionally(ex -> {
+                            log.error("Event failed. Error message = {}", ex.getMessage());
+                            // Optional: retry, put into Redis dead-letter queue
+                            return null;
+                        });
                         matched = true;
 
                         // remove matched driver from allMatchingCache
@@ -424,6 +448,7 @@ public class MatchingService {
         // If not matched, push rider back to waiting queue (end of queue)
         if (!matched) {
             riderWaitingQueueCache.add(rider);
+            log.info("Rider waiting queue: Rider added to waiting queue.");
         }
 
         // update waiting queue in redis

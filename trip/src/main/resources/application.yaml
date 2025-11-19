@@ -1,44 +1,50 @@
+server:
+  port: 8083
+
 spring:
   application:
     name: trip
+
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: kafka:9092
+
+    consumer:
+      group-id: trip-group
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
+      auto-offset-reset: earliest
+
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.ByteArraySerializer
-    consumer:
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.ByteArrayDeserializer
-      group-id: trip-service
-      # Recommended property for JSON Deserialization when using Protobuf
-      properties:
-        spring.json.use.type.headers: false
-    listener:
-      ack-mode: manual
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
+
   data:
     redis:
-      host: redis # We have assumed that "redis" is a Docker container. We will need to use Docker volumes to make the cache persistent.
+      host: redis
       port: 6379
-  grpc:
-    server:
-      port: 9090
+
+grpc:
+  server:
+    port: 9094
 
 kafka:
   topics:
-    rider-ride-completion: "rider-ride-completion"
-    driver-ride-completion: "driver-ride-completion"
-    driver-location-rider: "driver-location-rider"
-
-server:
-  port: 8081
+    rider-ride-completion: rider-ride-completion
+    driver-ride-completion: driver-ride-completion
+    driver-location-rider: driver-location-rider
 
 eureka:
   client:
-    register-with-eureka: true          # ✅ Register this service with Eureka
-    fetch-registry: true                # ✅ Allow discovery of other services
+    register-with-eureka: true
+    fetch-registry: true
     service-url:
-      defaultZone: http://localhost:8761/eureka
+      defaultZone: ${EUREKA_URL:http://registry:8761/eureka}
+
   instance:
-    prefer-ip-address: true             # ✅ Use IP instead of hostname
+    prefer-ip-address: true
     metadata-map:
-      grpc.port: 9094                   # ✅ Advertise gRPC port to Eureka
+      grpc.port: 9094
+
+logstash:
+  host: logstash
+  port: 5044

@@ -1,37 +1,24 @@
 # ===========================
-#  Stage 1: Build the JAR
+# BUILD STAGE
 # ===========================
 FROM maven:3.9.9-eclipse-temurin-21 AS builder
 
-# Set working directory
 WORKDIR /app
 
-# Copy the pom.xml and download dependencies (for caching)
-COPY pom.xml ./
-# Optional: copy parent pom if multi-module project
-COPY ../pom.xml ../
+COPY . /app
 
-# Copy source code
-COPY src ./src
+ENV PROTOC_CLASSIFIER=linux-x86_64
 
-# Package the application (skip tests for speed)
-RUN mvn clean package -DskipTests
+RUN mvn -Dprotoc.classifier=${PROTOC_CLASSIFIER} dependency:go-offline -B
+RUN mvn -Dprotoc.classifier=${PROTOC_CLASSIFIER} -pl rider -am clean package -DskipTests
 
 # ===========================
-#  Stage 2: Run the app
+# RUNTIME STAGE
 # ===========================
 FROM eclipse-temurin:21-jre-jammy
-
-# Set working directory
 WORKDIR /app
 
-# Copy JAR from builder stage
-ARG JAR_FILE=target/*.jar
-COPY --from=builder /app/${JAR_FILE} rider_service.jar
+COPY --from=builder /app/rider/target/*.jar rider_service.jar
 
-# ✅ Expose both HTTP (Spring Boot) and gRPC ports
-EXPOSE 8081
-EXPOSE 9093
-
-# Default startup command
+EXPOSE 8081 9093
 ENTRYPOINT ["java", "-jar", "rider_service.jar"]

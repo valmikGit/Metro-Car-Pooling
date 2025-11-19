@@ -2,13 +2,13 @@ spring:
   application:
     name: rider
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: kafka:9092
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.ByteArraySerializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
     consumer:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.ByteArrayDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
       group-id: rider-service
       # Recommended property for JSON Deserialization when using Protobuf
       properties:
@@ -28,15 +28,18 @@ kafka:
     rider-requests: "rider-requests"
 
 server:
-  port: 8081
+  port: 8082
 
 eureka:
   client:
     register-with-eureka: true          # ✅ Register this service with Eureka
     fetch-registry: true                # ✅ Allow discovery of other services
     service-url:
-      defaultZone: http://localhost:8761/eureka
+      defaultZone: ${EUREKA_URL:http://registry:8761/eureka}
   instance:
     prefer-ip-address: true             # ✅ Use IP instead of hostname
     metadata-map:
       grpc.port: 9093                   # ✅ Advertise gRPC port to Eureka
+logstash:
+  host: logstash
+  port: 5044

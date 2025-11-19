@@ -1,22 +1,35 @@
-spring:
-  application:
-    name: gateway
-  main:
-    web-application-type: reactive
-  security:
-    jwt:
-      # FIX: The secret key required by JwtUtil.java
-      # MUST be a long, BASE64-encoded string (32 bytes / 256 bits minimum)
-      # REPLACE THIS PLACEHOLDER KEY WITH A SECURELY GENERATED ONE!
-      secret: MTEwNjIwMjQ0NjE5MTE5MzE4Njg0MTk1MjMxNDQ2MjY3MTk2MTU2MjI4NTk3MzgxOTgxMTgwNzk0Nzg1MTkxNjI0OTE1MDYyMjIxMDI=
 server:
   port: 8081
 
+spring:
+  application:
+    name: gateway
+
+  main:
+    web-application-type: reactive
+
+  security:
+    jwt:
+      # Will be injected from environment variables (docker-compose)
+      secret: MTEwNjIwMjQ0NjE5MTE5MzE4Njg0MTk1MjMxNDQ2MjY3MTk2MTU2MjI4NTk3MzgxOTgxMTgwNzk0Nzg1MTkxNjI0OTE1MDYyMjIxMDI=
+
 eureka:
   client:
-    register-with-eureka: true        # ✅ Register the gateway itself
-    fetch-registry: true              # ✅ Fetch registry info for all microservices
+    register-with-eureka: true
+    fetch-registry: true
     service-url:
-      defaultZone: http://localhost:8761/eureka
+      # Overridden in docker-compose
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka}
+
   instance:
-    prefer-ip-address: true           # ✅ Use IP instead of hostname when registering
+    prefer-ip-address: true
+
+logstash:
+  host: ${LOGSTASH_HOST:logstash}
+  port: ${LOGSTASH_PORT:5044}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

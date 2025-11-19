@@ -32,6 +32,7 @@ public class UserController {
     @PostMapping("/add-driver")
     public SignUpOrLoginResponseDTO addDriver(@RequestBody DriverSignUpRequestDTO driverSignUpRequestDTO) {
         log.info("Reached RiderController.addDriver");
+        log.info("Driver signup: Username = {}", driverSignUpRequestDTO.getUsername());
         return SignUpOrLoginResponseDTO.builder()
                 .STATUS_CODE(userGrpcClient.DriverSignUpReq(driverSignUpRequestDTO).getSTATUSCODE())
                 .build();
@@ -40,6 +41,7 @@ public class UserController {
     @PostMapping("/add-rider")
     public SignUpOrLoginResponseDTO addRider(@RequestBody RiderSignUpRequestDTO riderSignUpRequestDTO) {
         log.info("Reached RiderController.addRider");
+        log.info("Rider signup: Username = {}", riderSignUpRequestDTO.getUsername());
         return SignUpOrLoginResponseDTO.builder()
                 .STATUS_CODE(userGrpcClient.RiderSignUpReq(riderSignUpRequestDTO).getSTATUSCODE())
                 .build();
@@ -48,6 +50,7 @@ public class UserController {
     @PostMapping("/login-driver")
     public ResponseEntity<?> loginDriver(@RequestBody UserLoginDTO userLoginDTO) {
         log.info("Reached RiderController.loginDriver");
+        log.info("Driver login: Username = {}", userLoginDTO.getUsername());
         SignUpOrLoginResponse signUpOrLoginResponse = userGrpcClient.DriverLoginReq(userLoginDTO);
         if (signUpOrLoginResponse.getSTATUSCODE() == 200) {
             // Generate JWT with "username" claim
@@ -68,6 +71,7 @@ public class UserController {
     @PostMapping("/login-rider")
     public ResponseEntity<?> loginRider(@RequestBody UserLoginDTO userLoginDTO) {
         log.info("Reached RiderController.loginRider");
+        log.info("Rider login: Username = {}", userLoginDTO.getUsername());
         SignUpOrLoginResponse signUpOrLoginResponse = userGrpcClient.RiderLoginReq(userLoginDTO);
         if (signUpOrLoginResponse.getSTATUSCODE() == 200) {
             // Generate JWT with "username" claim

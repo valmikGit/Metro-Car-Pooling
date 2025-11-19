@@ -1,0 +1,22 @@
+services:
+  user-service:
+    container_name: user-service
+    build:
+      context: ..
+      dockerfile: user/Dockerfile
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/metrocarpool
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://registry:8761/eureka
+      LOGSTASH_HOST: logstash
+      LOGSTASH_PORT: 5044
+    ports:
+      - "8082:8081"
+      - "9095:9095"
+    networks:
+      - infra_default
+
+networks:
+  infra_default:
+    external: true

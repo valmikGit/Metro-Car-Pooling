@@ -1,0 +1,28 @@
+# Ignore Maven build folders
+**/target/
+
+# Ignore infra data
+infra/
+redis/
+kafka/
+zookeeper/
+
+# Ignore CSV or dataset directories
+csv_generation/
+*.csv
+*.csv.gz
+
+# Ignore IDE files
+.idea/
+.vscode/
+
+# Ignore OS junk
+*.log
+*.tmp
+
+# Ignore Git
+.git/
+.gitignore
+
+# Ignore node_modules if any frontend inside project
+node_modules/
