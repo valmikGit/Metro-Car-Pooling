@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  gateway:
+    build:
+      context: ..               # build from project root
+      dockerfile: gateway/Dockerfile
+    container_name: gateway
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: default
+
+      # Eureka discovery server in infra
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://registry:8761/eureka
+
+      # Logstash (ELK)
+      LOGSTASH_HOST: logstash
+      LOGSTASH_PORT: 5044
+
+      # JWT key (Base64 encoded)
+      GATEWAY_JWT_SECRET: ${GATEWAY_JWT_SECRET}
+
+    networks:
+      - infra_default
+
+networks:
+  infra_default:
+    external: true
