@@ -93,9 +93,8 @@ services:
     container_name: elasticsearch
     environment:
       - discovery.type=single-node
-      - xpack.security.enabled=true
-      - ELASTIC_PASSWORD=changeme
-      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
     ports:
       - "9200:9200"
     volumes:
@@ -124,6 +123,8 @@ services:
     container_name: logstash
     depends_on:
       - elasticsearch
+    environment:
+      - xpack.monitoring.enabled=true
     ports:
       - "5044:5044"
     volumes:
@@ -133,3 +134,7 @@ volumes:
   redis_data:
   postgres_data:
   es-data:
+
+networks:
+  default:
+    name: infra_default
