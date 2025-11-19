@@ -1,45 +1,52 @@
+server:
+  port: 8084   # Use a unique port for the matching HTTP service
+
 spring:
   application:
     name: matching
+
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: kafka:9092
+
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.ByteArraySerializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
+
     consumer:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.ByteArrayDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
       group-id: matching-service
-      # Recommended property for JSON Deserialization when using Protobuf
       properties:
         spring.json.use.type.headers: false
+
     listener:
       ack-mode: manual
+
   data:
     redis:
       host: redis
       port: 6379
-  grpc:
-    server:
-      port: 9090
+
+grpc:
+  server:
+    port: 9091
 
 kafka:
   topics:
-    rider-driver-match: "rider-driver-match"
-
-server:
-  port: 8081
+    rider-driver-match: rider-driver-match
 
 eureka:
   client:
-    register-with-eureka: true          # ✅ Register this matching service with Eureka
-    fetch-registry: true                # ✅ Enable discovery of other services
+    register-with-eureka: true
+    fetch-registry: true
     service-url:
-      defaultZone: http://localhost:8761/eureka
+      defaultZone: ${EUREKA_URL:http://registry:8761/eureka}
+
   instance:
-    prefer-ip-address: true             # ✅ Use IP address for registration
+    prefer-ip-address: true
     metadata-map:
-      grpc.port: 9091                   # ✅ Advertise gRPC port for service discovery
+      grpc.port: 9091
+
 logstash:
   host: logstash
   port: 5044

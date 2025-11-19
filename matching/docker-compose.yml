@@ -1,0 +1,22 @@
+version: "3.8"
+
+services:
+  matching-service:
+    build:
+      context: ..
+      dockerfile: matching/Dockerfile
+    container_name: matching-service
+    ports:
+      - "8088:8084"     # host:container
+      - "9091:9091"
+    environment:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      EUREKA_URL: http://registry:8761/eureka
+    networks:
+      - infra_default
+
+networks:
+  infra_default:
+    external: true

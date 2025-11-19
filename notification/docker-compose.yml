@@ -1,0 +1,21 @@
+version: "3.8"
+
+services:
+  notification-service:
+    build:
+      context: ..
+      dockerfile: notification/Dockerfile
+    container_name: notification-service
+
+    ports:
+      - "8089:8085"   # host:container HTTP
+    environment:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      EUREKA_URL: http://registry:8761/eureka
+
+    networks:
+      - infra_default
+
+networks:
+  infra_default:
+    external: true

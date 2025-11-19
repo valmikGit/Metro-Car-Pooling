@@ -1,37 +1,24 @@
-# ===========================
-#  Stage 1: Build the JAR
-# ===========================
+# ============================
+# BUILD STAGE
+# ============================
 FROM maven:3.9.9-eclipse-temurin-21 AS builder
 
-# Set working directory inside the container
 WORKDIR /app
 
-# Copy the Maven build files first (for dependency caching)
-COPY pom.xml ./
-# Optional: copy parent pom if using a multi-module project
-COPY ../pom.xml ../
+# Copy entire multi-module project
+COPY . /app
 
-# Copy the application source code
-COPY src ./src
+# Build only the matching module
+RUN mvn -pl matching -am clean package -DskipTests
 
-# Build the Spring Boot JAR (skip tests for faster build)
-RUN mvn clean package -DskipTests
-
-# ===========================
-#  Stage 2: Run the JAR
-# ===========================
+# ============================
+# RUNTIME STAGE
+# ============================
 FROM eclipse-temurin:21-jre-jammy
-
-# Set working directory
 WORKDIR /app
 
-# Copy built JAR from builder stage
-ARG JAR_FILE=target/*.jar
-COPY --from=builder /app/${JAR_FILE} matching_service.jar
+COPY --from=builder /app/matching/target/*.jar matching_service.jar
 
-# Expose HTTP and gRPC ports based on application.yaml
-EXPOSE 8081        # HTTP server port
-EXPOSE 9091        # gRPC server port
+EXPOSE 8081 9091
 
-# Set default command to run the Spring Boot application
 ENTRYPOINT ["java", "-jar", "matching_service.jar"]
