@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.SignalType;
 
 import java.time.Duration;
 
@@ -24,7 +25,14 @@ public class NotificationController {
         log.info("Reached NotificationController.streamRiderDriverMatches.");
         return notificationGrpcClient.getMatchNotifications(status)
                 .map(match -> ServerSentEvent.builder(match).build())
-                .doFinally(signal -> System.out.println("SSE connection closed: " + signal))
+                .doFinally(signal -> {
+                    System.out.println("SSE connection closed: " + signal);
+                    if (signal.equals(SignalType.ON_ERROR)) {
+                        log.error("SSE connection closed: {}", signal);
+                    } else {
+                        log.info("SSE connection closed: {}", signal);
+                    }
+                })
                 .delayElements(Duration.ofMillis(100));
     }
 
@@ -34,7 +42,14 @@ public class NotificationController {
         log.info("Reached NotificationController.streamDriverRideCompletion.");
         return notificationGrpcClient.getDriverCompletionNotifications(status)
                 .map(event -> ServerSentEvent.builder(event).build())
-                .doFinally(signal -> System.out.println("SSE connection closed: " + signal))
+                .doFinally(signal -> {
+                    System.out.println("SSE connection closed: " + signal);
+                    if (signal.equals(SignalType.ON_ERROR)) {
+                        log.error("SSE connection closed: {}", signal);
+                    } else  {
+                        log.info("SSE connection closed: {}", signal);
+                    }
+                })
                 .delayElements(Duration.ofMillis(100));
     }
 
@@ -44,7 +59,14 @@ public class NotificationController {
         log.info("Reached NotificationController.streamRiderRideCompletion.");
         return notificationGrpcClient.getRiderCompletionNotifications(status)
                 .map(event -> ServerSentEvent.builder(event).build())
-                .doFinally(signal -> System.out.println("SSE connection closed: " + signal))
+                .doFinally(signal -> {
+                    System.out.println("SSE connection closed: " + signal);
+                    if (signal.equals(SignalType.ON_ERROR)) {
+                        log.error("SSE connection closed: {}", signal);
+                    } else {
+                        log.info("SSE connection closed: {}", signal);
+                    }
+                })
                 .delayElements(Duration.ofMillis(100));
     }
 
@@ -53,7 +75,14 @@ public class NotificationController {
         log.info("Reached NotificationController.streamDriverLocationForRider.");
         return notificationGrpcClient.getDriverLocationForRiderNotifications(status)
                 .map(event -> ServerSentEvent.builder(event).build())
-                .doFinally(signal -> System.out.println("SSE connection closed: " + signal))
+                .doFinally(signal -> {
+                    System.out.println("SSE connection closed: " + signal);
+                    if (signal.equals(SignalType.ON_ERROR)) {
+                        log.error("SSE connection closed: {}", signal);
+                    } else {
+                        log.info("SSE connection closed: {}", signal);
+                    }
+                })
                 .delayElements(Duration.ofMillis(100));
     }
 }
