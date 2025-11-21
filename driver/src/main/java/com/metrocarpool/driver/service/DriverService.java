@@ -188,53 +188,59 @@ public class DriverService {
             return;
         }
 
-        log.debug("cron tick - driver simulation starting");
-        log.info("CRON job ka tick-tick chal raha hai...");
-        // Read caches from Redis and normalize key/value types
-        Object rawDrivers = redisTemplate.opsForValue().get(DRIVER_CACHE_KEY);
-        Map<Long, DriverCache> allDriverCacheData = normalizeDriverCache(rawDrivers);
-        if (allDriverCacheData.isEmpty()) {
-            log.warn("Driver cache empty or unreadable. Key: {}", DRIVER_CACHE_KEY);
-            return;
-        }
-
-        // Tolerant reads (no @class requirement)
-        Map<String, Map<String, Double>> locationLocationMap = safeReadLocationMap();
-        if (locationLocationMap.isEmpty()) {
-            log.warn("Location map missing or empty. Key: {}", LOCATION_LOCATION_MAP_CACHE_KEY);
-            return;
-        }
-        Map<String, String> nearbyStationMap = safeReadNearby();
-
-        // Iterate drivers and update
-        List<Long> driversToEvict = new ArrayList<>();
-        for (Map.Entry<Long, DriverCache> e : allDriverCacheData.entrySet()) {
-            Long driverId = e.getKey();
-            DriverCache cache = e.getValue();
-            try {
-                boolean evict = processSingleDriverTick(driverId, cache, locationLocationMap, nearbyStationMap);
-                if (evict) {
-                    driversToEvict.add(driverId);
-                } else {
-                    // update the map value (already mutated)
-                    allDriverCacheData.put(driverId, cache);
-                }
-            } catch (Exception ex) {
-                log.error("Error processing driver {}: {}", driverId, ex.getMessage(), ex);
+        try {
+            log.debug("cron tick - driver simulation starting");
+            log.info("CRON job ka tick-tick chal raha hai...");
+            // Read caches from Redis and normalize key/value types
+            Object rawDrivers = redisTemplate.opsForValue().get(DRIVER_CACHE_KEY);
+            Map<Long, DriverCache> allDriverCacheData = normalizeDriverCache(rawDrivers);
+            if (allDriverCacheData.isEmpty()) {
+                log.warn("Driver cache empty or unreadable. Key: {}", DRIVER_CACHE_KEY);
+                return;
             }
+
+            // Tolerant reads (no @class requirement)
+            Map<String, Map<String, Double>> locationLocationMap = safeReadLocationMap();
+            if (locationLocationMap.isEmpty()) {
+                log.warn("Location map missing or empty. Key: {}", LOCATION_LOCATION_MAP_CACHE_KEY);
+                return;
+            }
+            Map<String, String> nearbyStationMap = safeReadNearby();
+
+            // Iterate drivers and update
+            List<Long> driversToEvict = new ArrayList<>();
+            for (Map.Entry<Long, DriverCache> e : allDriverCacheData.entrySet()) {
+                Long driverId = e.getKey();
+                DriverCache cache = e.getValue();
+                try {
+                    boolean evict = processSingleDriverTick(driverId, cache, locationLocationMap, nearbyStationMap);
+                    if (evict) {
+                        driversToEvict.add(driverId);
+                    } else {
+                        // update the map value (already mutated)
+                        allDriverCacheData.put(driverId, cache);
+                    }
+                } catch (Exception ex) {
+                    log.error("Error processing driver {}: {}", driverId, ex.getMessage(), ex);
+                }
+            }
+
+            // Evict drivers that reached final destination
+            for (Long id : driversToEvict) {
+                allDriverCacheData.remove(id);
+                log.info("Driver {} evicted from cache - reached final destination", id);
+            }
+
+            // Persist updated driver cache back to Redis
+            redisTemplate.opsForValue().set(DRIVER_CACHE_KEY, allDriverCacheData);
+
+            log.debug("cron tick - driver simulation finished. updated drivers: {}, evicted: {}",
+                    allDriverCacheData.size(), driversToEvict.size());
+        } catch (Exception e) {
+            log.error("Error = {}", e.getMessage(), e);
+        } finally {
+            redisDistributedLock.releaseLock(redisDriverLockKey, lockValue);
         }
-
-        // Evict drivers that reached final destination
-        for (Long id : driversToEvict) {
-            allDriverCacheData.remove(id);
-            log.info("Driver {} evicted from cache - reached final destination", id);
-        }
-
-        // Persist updated driver cache back to Redis
-        redisTemplate.opsForValue().set(DRIVER_CACHE_KEY, allDriverCacheData);
-
-        log.debug("cron tick - driver simulation finished. updated drivers: {}, evicted: {}",
-                allDriverCacheData.size(), driversToEvict.size());
     }
 
     private String tryAcquireLockWithRetry(String lockKey) {
