@@ -17,7 +17,7 @@ services:
       LOGSTASH_PORT: 5044
 
       # JWT key (Base64 encoded)
-      GATEWAY_JWT_SECRET: ${GATEWAY_JWT_SECRET}
+      GATEWAY_JWT_SECRET: MTEwNjIwMjQ0NjE5MTE5MzE4Njg0MTk1MjMxNDQ2MjY3MTk2MTU2MjI4NTk3MzgxOTgxMTgwNzk0Nzg1MTkxNjI0OTE1MDYyMjIxMDI=
 
     networks:
       - infra_default

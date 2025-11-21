@@ -92,6 +92,7 @@ export default function AuthPage() {
         body: JSON.stringify(payload),
       })
         const data = await response.json()
+        console.log(data)
 
       if (isLogin) {
         // Login flow - expects token in response
@@ -99,6 +100,7 @@ export default function AuthPage() {
           localStorage.setItem('authToken', data.token)
           localStorage.setItem('username', formData.username)
           localStorage.setItem('role', role)
+          localStorage.setItem('Id', data.userId)
           
           setSuccess('Login successful! Redirecting...')
           

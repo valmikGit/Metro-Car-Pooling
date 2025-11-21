@@ -25,7 +25,7 @@ public class UserGrpcServer extends UserServiceGrpc.UserServiceImplBase {
             DriverEntity driverEntity = userService.driverSignUp(request.getUsername(), request.getPassword(),
                     request.getLicenseId());
             SignUpOrLoginResponse signUpOrLoginResponse = SignUpOrLoginResponse.newBuilder()
-                    .setSTATUSCODE(driverEntity == null ? 200 : 401)
+                    .setSTATUSCODE(driverEntity == null ? 401 : 200)
                     .setUserId(driverEntity == null ? -1 : driverEntity.getId())
                     .build();
             responseObserver.onNext(signUpOrLoginResponse);
@@ -44,7 +44,7 @@ public class UserGrpcServer extends UserServiceGrpc.UserServiceImplBase {
 
             RiderEntity riderEntity = userService.riderSignUp(request.getUsername(), request.getPassword());
             SignUpOrLoginResponse signUpOrLoginResponse = SignUpOrLoginResponse.newBuilder()
-                    .setSTATUSCODE(riderEntity == null ? 200 : 401)
+                    .setSTATUSCODE(riderEntity == null ? 401 : 200)
                     .setUserId(riderEntity == null ? -1 : riderEntity.getId())
                     .build();
             responseObserver.onNext(signUpOrLoginResponse);
@@ -63,7 +63,7 @@ public class UserGrpcServer extends UserServiceGrpc.UserServiceImplBase {
 
             DriverEntity driverEntity = userService.driverLogin(request.getUsername(), request.getPassword());
             SignUpOrLoginResponse signUpOrLoginResponse =  SignUpOrLoginResponse.newBuilder()
-                    .setSTATUSCODE(driverEntity == null ? 200 : 401)
+                    .setSTATUSCODE(driverEntity == null ? 401 : 200)
                     .setUserId(driverEntity == null ? -1 : driverEntity.getId())
                     .build();
             responseObserver.onNext(signUpOrLoginResponse);
@@ -82,7 +82,7 @@ public class UserGrpcServer extends UserServiceGrpc.UserServiceImplBase {
 
             RiderEntity riderEntity = userService.riderLogin(request.getUsername(), request.getPassword());
             SignUpOrLoginResponse signUpOrLoginResponse =   SignUpOrLoginResponse.newBuilder()
-                    .setSTATUSCODE(riderEntity == null ? 200 : 401)
+                    .setSTATUSCODE(riderEntity == null ? 401 : 200)
                     .setUserId(riderEntity == null ? -1 : riderEntity.getId())
                     .build();
             responseObserver.onNext(signUpOrLoginResponse);
