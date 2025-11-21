@@ -61,7 +61,7 @@ services:
   registry:
     build:
       context: ..
-      dockerfile: registry/Dockerfile
+      dockerfile: infra/registry/Dockerfile
     container_name: registry
     ports:
       - "8761:8761"
