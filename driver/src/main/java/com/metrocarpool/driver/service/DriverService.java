@@ -5,6 +5,7 @@ import com.metrocarpool.contracts.proto.DriverRideCompletionEvent;
 import com.metrocarpool.contracts.proto.DriverRiderMatchEvent;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.metrocarpool.driver.cache.DriverCache;
+import com.metrocarpool.driver.redislock.RedisDistributedLock;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import lombok.extern.slf4j.Slf4j;
@@ -18,7 +19,6 @@ import org.springframework.kafka.support.Acknowledgment;
 
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
@@ -53,6 +53,12 @@ public class DriverService {
     private final RedisTemplate<String, Object> redisTemplateLocationMap;
     private static final String LOCATION_LOCATION_MAP_CACHE_KEY = "location-location-map";
 
+    // Redis Distributed Lock
+    private final RedisDistributedLock redisDistributedLock;
+    private static final String redisDriverLockKey = "lock:drivers";
+    private static final String redisNearbyLocationsLockKey = "lock:nearby-locations";
+    private static final String redisLocationLocationMapLockKey = "lock:location-location";
+
     // String template + mapper for tolerant reads of plain JSON (no @class)
     private final RedisTemplate<String, String> redisStringTemplate;
     private final ObjectMapper objectMapper;
@@ -63,6 +69,14 @@ public class DriverService {
 
     public boolean processDriverInfo(Long driverId, List<String> routePlaces, String finalDestination,
                                      Integer availableSeats) {
+        // Try to acquire lock
+        String lockValue = tryAcquireLockWithRetry(redisDriverLockKey);
+        if (lockValue == null) {
+            log.error("Unable to acquire lock with retry policy: {} lock key {} timeout milliseconds {} maximum retries {} back off milliseconds. " +
+                            "Returning false", redisDriverLockKey, 5000, 10, 200);
+            return false;
+        }
+
         try {
             // Validate basic inputs early
             if (driverId == null || routePlaces == null || routePlaces.size() < 2 ||
@@ -108,12 +122,21 @@ public class DriverService {
         } catch (Exception e) {
             log.error("Failed to process driver info for ID {}: {}. Returning false.", driverId, e.getMessage());
             return false;
+        } finally {
+            redisDistributedLock.releaseLock(redisDriverLockKey, lockValue);
         }
     }
 
     @KafkaListener(topics = "rider-driver-match", groupId = "matching-service")
     public void matchFoundUpdateCache(byte[] message,
                                       Acknowledgment acknowledgment) {
+        // Try to acquire lock
+        String lockValue = tryAcquireLockWithRetry(redisDriverLockKey);
+        if (lockValue == null) {
+            log.error("Unable to acquire lock with retry policy: {} lock key {} timeout milliseconds {} maximum retries {} back off milliseconds. " +
+                    "Returning false", redisDriverLockKey, 5000, 10, 200);
+            return;
+        }
 
         try{
             DriverRiderMatchEvent  event = DriverRiderMatchEvent.parseFrom(message);
@@ -147,8 +170,9 @@ public class DriverService {
             redisTemplate.opsForValue().set(DRIVER_CACHE_KEY, allDriverCacheData);
         } catch (InvalidProtocolBufferException e){
             log.error("Failed to parse RiderDriverMatchEvent protobuf message", e);
+        } finally {
+            redisDistributedLock.releaseLock(redisDriverLockKey, lockValue);
         }
-        
     }
 
    /**
@@ -156,53 +180,87 @@ public class DriverService {
      */
     @Scheduled(cron = "0 */2 * * * *")
     public void cronJobDriverLocationSimulation() {
-        log.debug("cron tick - driver simulation starting");
-        log.info("CRON job ka tick-tick chal raha hai...");
-        // Read caches from Redis and normalize key/value types
-        Object rawDrivers = redisTemplate.opsForValue().get(DRIVER_CACHE_KEY);
-        Map<Long, DriverCache> allDriverCacheData = normalizeDriverCache(rawDrivers);
-        if (allDriverCacheData.isEmpty()) {
-            log.warn("Driver cache empty or unreadable. Key: {}", DRIVER_CACHE_KEY);
+        // Try to acquire lock
+        String lockValue = tryAcquireLockWithRetry(redisDriverLockKey);
+        if (lockValue == null) {
+            log.error("Unable to acquire lock with retry policy: {} lock key {} timeout milliseconds {} maximum retries {} back off milliseconds. " +
+                    "Returning false", redisDriverLockKey, 5000, 10, 200);
             return;
         }
 
-        // Tolerant reads (no @class requirement)
-        Map<String, Map<String, Double>> locationLocationMap = safeReadLocationMap();
-        if (locationLocationMap.isEmpty()) {
-            log.warn("Location map missing or empty. Key: {}", LOCATION_LOCATION_MAP_CACHE_KEY);
-            return;
-        }
-        Map<String, String> nearbyStationMap = safeReadNearby();
+        try {
+            log.debug("cron tick - driver simulation starting");
+            log.info("CRON job ka tick-tick chal raha hai...");
+            // Read caches from Redis and normalize key/value types
+            Object rawDrivers = redisTemplate.opsForValue().get(DRIVER_CACHE_KEY);
+            Map<Long, DriverCache> allDriverCacheData = normalizeDriverCache(rawDrivers);
+            if (allDriverCacheData.isEmpty()) {
+                log.warn("Driver cache empty or unreadable. Key: {}", DRIVER_CACHE_KEY);
+                return;
+            }
 
-        // Iterate drivers and update
-        List<Long> driversToEvict = new ArrayList<>();
-        for (Map.Entry<Long, DriverCache> e : allDriverCacheData.entrySet()) {
-            Long driverId = e.getKey();
-            DriverCache cache = e.getValue();
-            try {
-                boolean evict = processSingleDriverTick(driverId, cache, locationLocationMap, nearbyStationMap);
-                if (evict) {
-                    driversToEvict.add(driverId);
-                } else {
-                    // update the map value (already mutated)
-                    allDriverCacheData.put(driverId, cache);
+            // Tolerant reads (no @class requirement)
+            Map<String, Map<String, Double>> locationLocationMap = safeReadLocationMap();
+            if (locationLocationMap.isEmpty()) {
+                log.warn("Location map missing or empty. Key: {}", LOCATION_LOCATION_MAP_CACHE_KEY);
+                return;
+            }
+            Map<String, String> nearbyStationMap = safeReadNearby();
+
+            // Iterate drivers and update
+            List<Long> driversToEvict = new ArrayList<>();
+            for (Map.Entry<Long, DriverCache> e : allDriverCacheData.entrySet()) {
+                Long driverId = e.getKey();
+                DriverCache cache = e.getValue();
+                try {
+                    boolean evict = processSingleDriverTick(driverId, cache, locationLocationMap, nearbyStationMap);
+                    if (evict) {
+                        driversToEvict.add(driverId);
+                    } else {
+                        // update the map value (already mutated)
+                        allDriverCacheData.put(driverId, cache);
+                    }
+                } catch (Exception ex) {
+                    log.error("Error processing driver {}: {}", driverId, ex.getMessage(), ex);
                 }
-            } catch (Exception ex) {
-                log.error("Error processing driver {}: {}", driverId, ex.getMessage(), ex);
+            }
+
+            // Evict drivers that reached final destination
+            for (Long id : driversToEvict) {
+                allDriverCacheData.remove(id);
+                log.info("Driver {} evicted from cache - reached final destination", id);
+            }
+
+            // Persist updated driver cache back to Redis
+            redisTemplate.opsForValue().set(DRIVER_CACHE_KEY, allDriverCacheData);
+
+            log.debug("cron tick - driver simulation finished. updated drivers: {}, evicted: {}",
+                    allDriverCacheData.size(), driversToEvict.size());
+        } catch (Exception e) {
+            log.error("Error = {}", e.getMessage(), e);
+        } finally {
+            redisDistributedLock.releaseLock(redisDriverLockKey, lockValue);
+        }
+    }
+
+    private String tryAcquireLockWithRetry(String lockKey) {
+        for (int attempt = 1; attempt <= 10; attempt++) {
+            String lockValue = redisDistributedLock.acquireLock(lockKey, 5000);
+            if (lockValue != null) {
+                return lockValue;  // success
+            }
+
+            log.warn("Lock not acquired for key {}. Attempt {}/{}. Retrying in {} ms...",
+                    lockKey, attempt, 10, (long) 200);
+
+            try {
+                Thread.sleep((long) 200);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return null;
             }
         }
-
-        // Evict drivers that reached final destination
-        for (Long id : driversToEvict) {
-            allDriverCacheData.remove(id);
-            log.info("Driver {} evicted from cache - reached final destination", id);
-        }
-
-        // Persist updated driver cache back to Redis
-        redisTemplate.opsForValue().set(DRIVER_CACHE_KEY, allDriverCacheData);
-
-        log.debug("cron tick - driver simulation finished. updated drivers: {}, evicted: {}",
-                allDriverCacheData.size(), driversToEvict.size());
+        return null; // all retries failed
     }
 
     /**
@@ -402,6 +460,14 @@ public class DriverService {
 
     // Safe readers that accept plain JSON strings and serializer JSON alike
     private Map<String, String> safeReadNearby() {
+        // Try to acquire lock
+        String lockValue = tryAcquireLockWithRetry(redisNearbyLocationsLockKey);
+        if (lockValue == null) {
+            log.error("Unable to acquire lock with retry policy: {} lock key {} timeout milliseconds {} maximum retries {} back off milliseconds. " +
+                    "Returning false", redisNearbyLocationsLockKey, 5000, 10, 200);
+            return null;
+        }
+
         try {
             log.info("Reached DriverService.safeReadNearby.");
             String json = redisStringTemplate.opsForValue().get(NEARBY_STATIONS_CACHE_KEY);
@@ -418,10 +484,19 @@ public class DriverService {
         } catch (Exception e) {
             log.error("nearby-stations parse failed: {}", e.getMessage());
             return new HashMap<>();
+        } finally {
+            redisDistributedLock.releaseLock(redisNearbyLocationsLockKey, lockValue);
         }
     }
 
     private Map<String, Map<String, Double>> safeReadLocationMap() {
+        // Try to acquire lock
+        String lockValue = tryAcquireLockWithRetry(redisLocationLocationMapLockKey);
+        if (lockValue == null) {
+            log.error("Unable to acquire lock with retry policy: {} lock key {} timeout milliseconds {} maximum retries {} back off milliseconds. " +
+                    "Returning false", redisLocationLocationMapLockKey, 5000, 10, 200);
+        }
+
         try {
             log.info("Reached DriverService.safeReadLocationMap.");
             String json = redisStringTemplate.opsForValue().get(LOCATION_LOCATION_MAP_CACHE_KEY);
@@ -454,6 +529,8 @@ public class DriverService {
         } catch (Exception e) {
             log.error("location-location-map parse failed: {}", e.getMessage());
             return new HashMap<>();
+        } finally {
+            redisDistributedLock.releaseLock(redisLocationLocationMapLockKey, lockValue);
         }
     }
 
