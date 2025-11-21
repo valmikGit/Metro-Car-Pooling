@@ -20,6 +20,7 @@ import java.util.Map;
 @RestController
 @Builder
 @RequestMapping("/api/user")
+@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
 @Slf4j
 public class UserController {
 
