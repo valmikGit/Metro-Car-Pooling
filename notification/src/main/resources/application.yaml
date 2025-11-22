@@ -5,14 +5,27 @@ spring:
   kafka:
     bootstrap-servers: kafka:9092
 
-    consumer:
-      group-id: notification-service
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
-
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
+      # Idempotent Producer Settings
+      properties:
+        enable.idempotence: true
+        acks: all
+        retries: 2147483647               # Integer.MAX_VALUE
+        max.in.flight.requests.per.connection: 1
+
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
+      group-id: notification-service
+      properties:
+        spring.json.use.type.headers: false
+        # Idempotent Consumer Setting
+        isolation.level: read_committed   # Ensures consumer reads only committed messages
+
+    listener:
+      ack-mode: manual
 
 
 grpc:
