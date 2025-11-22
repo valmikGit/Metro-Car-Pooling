@@ -58,18 +58,12 @@ export function RideRequestForm({ onSubmit, riderId }: RideRequestFormProps) {
       parseInt(minutes)
     )
     
-    // Convert to protobuf Timestamp format (seconds and nanos)
-    const seconds = Math.floor(dateTime.getTime() / 1000)
-    const nanos = (dateTime.getTime() % 1000) * 1000000
-    
+    // Change: Send ISO string directly
     const requestData = {
       riderId: riderId,
       pickUpStation: pickUpStation,
       destinationPlace: destinationPlace,
-      arrivalTime: {
-        seconds: seconds,
-        nanos: nanos
-      }
+      arrivalTime: dateTime.toISOString()
     }
 
     onSubmit(requestData)

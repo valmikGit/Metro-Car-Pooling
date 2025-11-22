@@ -19,28 +19,56 @@ public class RiderController {
     @Autowired
     private RiderGrpcClient riderGrpcClient;
 
+    // Define a request DTO specifically for the JSON input
+    @lombok.Data
+    static class RiderRequest {
+        private Long riderId;
+        private String pickUpStation;
+        private String destinationPlace;
+        private String arrivalTime; // Accepts ISO String
+    }
+
     @PostMapping(value = "/rider-info")
-    public RiderStatusResponseDTO postRiderInformation(@RequestBody PostRiderDTO postRiderDTO) {
+    public RiderStatusResponseDTO postRiderInformation(@RequestBody RiderRequest request) {
         log.info("RiderController.postRiderInformation.");
+        log.info("Received request: {}", request);
 
-        // Call GRPC
-        var response = riderGrpcClient.postRiderInfo(postRiderDTO);
+        // We keep ISO in PostRiderDTO, because frontend sends ISO
+        PostRiderDTO postRiderDTO = new PostRiderDTO();
+        postRiderDTO.setRiderId(request.getRiderId());
+        postRiderDTO.setPickUpStation(request.getPickUpStation());
+        postRiderDTO.setDestinationPlace(request.getDestinationPlace());
+        postRiderDTO.setArrivalTime(request.getArrivalTime()); // keep ISO string
 
-        // Convert protobuf timestamp to ISO string
-        String arrivalIso = convertProtoTimestampToIso(
-                postRiderDTO.getArrivalTime()
+        // Convert ISO → Protobuf Timestamp ONLY for GRPC
+        Timestamp protoTimestamp = convertIsoToProtoTimestamp(request.getArrivalTime());
+
+        // Send to gRPC client (update RiderGrpcClient to accept proto timestamp separately)
+        var response = riderGrpcClient.postRiderInfo(
+                postRiderDTO.getRiderId(),
+                postRiderDTO.getPickUpStation(),
+                postRiderDTO.getDestinationPlace(),
+                protoTimestamp
         );
 
         return RiderStatusResponseDTO.builder()
                 .STATUSSSSS(response.getStatus())
-                .arrivalTime(arrivalIso)     // <-- send converted value
                 .build();
     }
 
-
-    private String convertProtoTimestampToIso(com.google.protobuf.Timestamp ts) {
-        return java.time.Instant
-                .ofEpochSecond(ts.getSeconds(), ts.getNanos())
-                .toString();   // ISO 8601 string
+    private Timestamp convertIsoToProtoTimestamp(String isoString) {
+        try {
+            // Parse ISO 8601 string to Instant
+            Instant instant = Instant.parse(isoString);
+            
+            // Convert to protobuf Timestamp
+            return Timestamp.newBuilder()
+                    .setSeconds(instant.getEpochSecond())
+                    .setNanos(instant.getNano())
+                    .build();
+        } catch (Exception e) {
+            log.error("Failed to parse ISO timestamp: {}", isoString, e);
+            throw new IllegalArgumentException("Invalid ISO timestamp format: " + isoString);
+        }
     }
 }
