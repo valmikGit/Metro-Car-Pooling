@@ -149,7 +149,7 @@ export default function RiderPage() {
 
       console.log('Response:', response)
 
-      if (response && response.status === 200) {
+      if (response && response.status === 200) {  
         alert('🎉 Ride request submitted successfully!')
         setActiveTab('matches')
         setDisableRequestTab(true)

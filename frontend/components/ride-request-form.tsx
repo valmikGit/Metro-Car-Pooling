@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import locationsData from '@/lib/locations.json'
+import locationsData from '@/data/nodes.json'
+import metroStations from '@/data/mapping.json'
 
 interface RideRequestFormProps {
   onSubmit: (data: any) => void
@@ -20,6 +21,23 @@ export function RideRequestForm({ onSubmit, riderId }: RideRequestFormProps) {
   const nodes = Array.isArray(locationsData) 
     ? locationsData 
     : (locationsData as any).nodes || Object.keys(locationsData)
+
+  // Extract metro stations from mapping.json - only those with non-empty values
+  const getMetroStations = (): string[] => {
+    const stations = new Set<string>()
+    
+    Object.entries(metroStations).forEach(([key, value]) => {
+      // Only add if value is not empty string
+      if (value && value !== '') {
+        stations.add(key)
+      }
+    })
+    
+    // Convert Set to Array and sort alphabetically
+    return Array.from(stations).sort()
+  }
+
+  const metroStationList = getMetroStations()
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -101,10 +119,10 @@ export function RideRequestForm({ onSubmit, riderId }: RideRequestFormProps) {
           required
         >
           <option value="">Select your pickup station...</option>
-          {nodes && nodes.length > 0 ? (
-            nodes.map((node: string, index: number) => (
-              <option key={index} value={node}>
-                {node}
+          {metroStationList && metroStationList.length > 0 ? (
+            metroStationList.map((station: string, index: number) => (
+              <option key={index} value={station}>
+                {station}
               </option>
             ))
           ) : (
@@ -146,10 +164,10 @@ export function RideRequestForm({ onSubmit, riderId }: RideRequestFormProps) {
           required
         >
           <option value="">Select your destination...</option>
-          {nodes && nodes.length > 0 ? (
-            nodes.map((node: string, index: number) => (
-              <option key={index} value={node}>
-                {node}
+          {metroStationList && metroStationList.length > 0 ? (
+            metroStationList.map((station: string, index: number) => (
+              <option key={index} value={station}>
+                {station}
               </option>
             ))
           ) : (

@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import locationsData from '@/lib/locations.json'
+import locationsData from '@/data/nodes.json'
 
 interface RideOfferFormProps {
   onSubmit: (data: any) => void
