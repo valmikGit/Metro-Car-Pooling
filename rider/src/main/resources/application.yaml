@@ -5,7 +5,7 @@ spring:
     bootstrap-servers: kafka:9092
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
       # Idempotent Producer Settings
       properties:
         enable.idempotence: true
