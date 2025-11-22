@@ -1,5 +1,6 @@
 package com.metrocarpool.matching.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.protobuf.Timestamp;
 import com.metrocarpool.contracts.proto.DriverLocationEvent;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -29,6 +30,7 @@ import java.util.LinkedList;
 import java.util.Objects;
 import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @Slf4j
@@ -51,6 +53,14 @@ public class MatchingService {
     private static final String redisDriverLockKey = "lock:drivers";
     private static final String redisWaitingQueueLockKey = "lock:rider-waiting-queue";
     private static final String redisDistanceLockKey = "lock:distance";
+
+    // Redis usage to ensure Kafka consumer idempotency
+    private static final String DRIVER_UPDATE_KAFKA_DEDUP_KEY_PREFIX = "driver_update_processed_kafka_msg:";
+    private static final String RIDER_REQUEST_KAFKA_DEDUP_KEY_PREFIX = "rider_request_processed_kafka_msg:";
+
+    // String template + mapper for tolerant reads of plain JSON (no @class)
+    private final RedisTemplate<String, String> redisStringTemplate;
+    private final ObjectMapper objectMapper;
 
     // Thresholds (tune as required)
     private static final int DISTANCE_THRESHOLD_UNITS = 5;            // X units (distance)
@@ -76,6 +86,23 @@ public class MatchingService {
         return null; // all retries failed
     }
 
+    private boolean alreadyProcessed(String topicDedupKey, String messageId) {
+        if (messageId == null) return false;
+
+        String redisKey = topicDedupKey + messageId;
+
+        return redisStringTemplate.hasKey(redisKey);
+    }
+
+    private void markProcessed(String topicDedupKey, String messageId) {
+        if (messageId == null) return;
+
+        String redisKey = topicDedupKey + messageId;
+
+        // store marker with 24-hour TTL
+        redisStringTemplate.opsForValue().set(redisKey, "1", 24, TimeUnit.HOURS);
+    }
+
     @KafkaListener(topics = "driver-updates", groupId = "matching-service")
     public void driverInfoUpdateCache(byte[] message, Acknowledgment ack) {
         // Try to acquire lock
@@ -90,14 +117,25 @@ public class MatchingService {
             log.info("Reached MatchingService.driverInfoUpdateCache.");
 
             DriverLocationEvent event = DriverLocationEvent.parseFrom(message);
+            String messageId = event.getMessageId();
+            if (alreadyProcessed(DRIVER_UPDATE_KAFKA_DEDUP_KEY_PREFIX, messageId)) {
+                log.info("MatchingService.driverInfoUpdateCache: Duplicate Kafka message detected. Skipping. messageId={}",
+                        messageId);
+                ack.acknowledge();
+                return;
+            }
+
             Long driverId = event.getDriverId();
             String oldStation = event.getOldStation();
             String nextStation = event.getNextStation();
             Duration timeToNextStation = Duration.ofSeconds(event.getTimeToNextStation());
             Integer availableSeats = event.getAvailableSeats();
             String finalDestination = event.getFinalDestination();
+
             // Acknowledge the message
+            markProcessed(DRIVER_UPDATE_KAFKA_DEDUP_KEY_PREFIX, messageId);
             ack.acknowledge();
+
             // Update in Redis cache
             HashMap<String, HashMap<String, List<MatchingDriverCache>>> allMatchingCache =
                     (HashMap<String, HashMap<String, List<MatchingDriverCache>>>) redisDriverTemplate.opsForValue().get(MATCHING_DRIVER_CACHE_KEY);
@@ -171,13 +209,25 @@ public class MatchingService {
             return;
         }
 
-        try{
+        try {
             log.info("Reached MatchingService.riderInfoDriverMatchingAlgorithm.");
             RiderRequestDriverEvent tempEvent = RiderRequestDriverEvent.parseFrom(message);
+            String messageId = tempEvent.getMessageId();
+
+            if (alreadyProcessed(RIDER_REQUEST_KAFKA_DEDUP_KEY_PREFIX, messageId)) {
+                log.info("MatchingService.riderInfoDriverMatchingALgorithm: Duplicate Kafka message detected. Skipping. messageId={}",
+                        messageId);
+                acknowledgment.acknowledge();
+                return;
+            }
+
             long riderId = tempEvent.getRiderId();
             String pickUpStation = tempEvent.getPickUpStation();
             com.google.protobuf.Timestamp arrivalTime = tempEvent.getArrivalTime();
             String destinationPlace = tempEvent.getDestinationPlace();
+
+            // Acknowledge the message
+            markProcessed(RIDER_REQUEST_KAFKA_DEDUP_KEY_PREFIX, messageId);
             acknowledgment.acknowledge();
 
             // Load caches from Redis

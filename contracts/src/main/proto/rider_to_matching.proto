@@ -15,4 +15,5 @@ message RiderRequestDriverEvent {
   string pickUpStation = 2;
   google.protobuf.Timestamp arrivalTime = 3;
   string destinationPlace = 4;
+  string messageId = 5;
 }

@@ -21,7 +21,7 @@ public class RiderController {
     public RiderStatusResponseDTO postRiderInformation(@RequestBody PostRiderDTO postRiderDTO) {
         log.info("RiderController.postRiderInformation.");
         return RiderStatusResponseDTO.builder()
-                .status(riderGrpcClient.postRiderInfo(postRiderDTO).getStatus())
+                .STATUSSSSS(riderGrpcClient.postRiderInfo(postRiderDTO).getStatus())
                 .build();
     }
 }

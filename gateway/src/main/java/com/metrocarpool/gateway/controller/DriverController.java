@@ -21,7 +21,7 @@ public class DriverController {
     public DriverStatusResponseDTO postDriverInformation(@RequestBody PostDriverDTO postDriverDTO) {
         log.info("Reached DriverController.postDriverInformation.");
         return DriverStatusResponseDTO.builder()
-                .status(driverGrpcClient.postDriverInfo(postDriverDTO).getStatus())
+                .STATUSSSSS(driverGrpcClient.postDriverInfo(postDriverDTO).getStatus())
                 .build();
     }
 }

@@ -15,4 +15,5 @@ message DriverRiderMatchEvent {
   int64 driverId = 2;
   string pickUpStation = 3;
   google.protobuf.Timestamp driverArrivalTime = 4;
+  string messageId = 5;
 }

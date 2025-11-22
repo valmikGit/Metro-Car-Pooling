@@ -15,4 +15,5 @@ message DriverLocationEvent {
   int32 timeToNextStation = 4;
   int32 availableSeats = 5;
   string finalDestination = 6;
+  string messageId = 7;
 }

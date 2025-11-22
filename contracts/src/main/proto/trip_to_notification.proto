@@ -19,14 +19,16 @@ option java_outer_classname = "RiderCompletionAllUsersEventMessage";
 //  UserType userType = 3;
 //}
 
-message DriverRideCompletion {
+message DriverRideCompletionKafka {
   int64 driverId = 1;
   string eventMessage = 2;
+  string messageId = 3;
 }
 
-message RiderRideCompletion {
+message RiderRideCompletionKafka {
   int64 riderId = 1;
   string eventMessage = 2;
+  string messageId = 3;
 }
 
 message DriverLocationForRiderEvent {
@@ -35,4 +37,5 @@ message DriverLocationForRiderEvent {
   string nextStation = 3;
   int32 timeToNextStation = 4;
   int64 riderId = 5;
+  string messageId = 6;
 }

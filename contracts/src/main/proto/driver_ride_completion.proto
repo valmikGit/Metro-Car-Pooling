@@ -10,4 +10,5 @@ option java_outer_classname = "DriverRideCompletionEventMessage";
 // The Kafka event definition
 message DriverRideCompletionEvent {
   int64 driverId = 1;
+  string messageId = 2;
 }

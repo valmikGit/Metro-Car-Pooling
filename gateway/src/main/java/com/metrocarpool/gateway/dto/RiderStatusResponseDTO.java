@@ -4,5 +4,5 @@ import lombok.Builder;
 
 @Builder
 public class RiderStatusResponseDTO {
-    private Boolean status;
+    private Boolean STATUSSSSS;
 }

@@ -1,5 +1,6 @@
 package com.metrocarpool.trip.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.metrocarpool.contracts.proto.*;
 import com.metrocarpool.trip.redislock.RedisDistributedLock;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +18,7 @@ import org.springframework.kafka.support.Acknowledgment;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @Slf4j
@@ -37,6 +39,33 @@ public class TripService {
     // Redis Distributed Lock
     private final RedisDistributedLock redisDistributedLock;
     private static final String redisTripLockKey = "lock:trip";
+
+    // String template + mapper for tolerant reads of plain JSON (no @class)
+    private final RedisTemplate<String, String> redisStringTemplate;
+    private final ObjectMapper objectMapper;
+
+    // Redis usage to ensure Kafka consumer idempotency
+    private static final String RIDER_DRIVER_MATCH_KAFKA_DEDUP_KEY_PREFIX = "rider_driver_match_processed_kafka_msg:";
+    private static final String TRIP_COMPLETED_KAFKA_DEDUP_KEY_PREFIX = "trip_completed_processed_kafka_msg:";
+    private static final String DRIVER_UPDATES_KAFKA_DEDUP_KEY_PREFIX = "driver_updates_processed_kafka_msg:";
+    private static final String DRIVER_LOCATION_RIDER_KAFKA_DEDUP_KEY_PREFIX = "driver_location_rider_processed_kafka_msg:";
+
+    private boolean alreadyProcessed(String topicDedupKey, String messageId) {
+        if (messageId == null) return false;
+
+        String redisKey = topicDedupKey + messageId;
+
+        return redisStringTemplate.hasKey(redisKey);
+    }
+
+    private void markProcessed(String topicDedupKey, String messageId) {
+        if (messageId == null) return;
+
+        String redisKey = topicDedupKey + messageId;
+
+        // store marker with 24-hour TTL
+        redisStringTemplate.opsForValue().set(redisKey, "1", 24, TimeUnit.HOURS);
+    }
 
     private String tryAcquireLockWithRetry(String lockKey) {
         for (int attempt = 1; attempt <= 10; attempt++) {
@@ -73,9 +102,21 @@ public class TripService {
             log.info("Reached TripService.matchFound.");
 
             DriverRiderMatchEvent tempEvent = DriverRiderMatchEvent.parseFrom(message);
+            String messageId = tempEvent.getMessageId();
+
+            if (alreadyProcessed(RIDER_DRIVER_MATCH_KAFKA_DEDUP_KEY_PREFIX,  messageId)) {
+                log.info("TripService.matchFound: Duplicate Kafka message detected. Skipping. messageId={}",
+                        messageId);
+                acknowledgment.acknowledge();
+                return;
+            }
+
             Long driverId = tempEvent.getDriverId();
             Long riderId = tempEvent.getRiderId();
             String pickUpStation = tempEvent.getPickUpStation();
+
+            // Acknowledge manually
+            markProcessed(RIDER_DRIVER_MATCH_KAFKA_DEDUP_KEY_PREFIX, messageId);
             acknowledgment.acknowledge();
 
             // Update the cache => push this pair {riderId, pickUpStation} in the list associated with key == driverId
@@ -111,8 +152,18 @@ public class TripService {
             log.info("Reached TripService.tripCompleted.");
 
             DriverRideCompletionEvent tempEvent = DriverRideCompletionEvent.parseFrom(message);
+            String messageId = tempEvent.getMessageId();
+            if (alreadyProcessed(TRIP_COMPLETED_KAFKA_DEDUP_KEY_PREFIX, messageId)) {
+                log.info("NotificationService.tripCompleted: Duplicate Kafka message detected. Skipping. messageId={}",
+                        messageId);
+                acknowledgment.acknowledge();
+                return;
+            }
+
             Long driverId = tempEvent.getDriverId();
+
             // Acknowledge that the message has been received
+            markProcessed(TRIP_COMPLETED_KAFKA_DEDUP_KEY_PREFIX, messageId);
             acknowledgment.acknowledge();
 
             // Retrieve the trip cache from Redis
@@ -134,7 +185,7 @@ public class TripService {
             }
 
             // 1️⃣ Produce a Kafka event for the driver’s ride completion
-            DriverRideCompletion driverRideCompletion = DriverRideCompletion.newBuilder()
+            DriverRideCompletionKafka driverRideCompletion = DriverRideCompletionKafka.newBuilder()
                     .setDriverId(driverId)
                     .setEventMessage("Driver Ride Completed")
                     .build();
@@ -153,7 +204,7 @@ public class TripService {
 
             // 2️⃣ Produce Kafka events for all associated riders
             for (TripCache riderTrip : riderList) {
-                RiderRideCompletion riderRideCompletion = RiderRideCompletion.newBuilder()
+                RiderRideCompletionKafka riderRideCompletion = RiderRideCompletionKafka.newBuilder()
                         .setRiderId(riderTrip.getRiderId())
                         .setEventMessage("Rider Ride Completed")
                         .build();
@@ -195,10 +246,21 @@ public class TripService {
             log.info("Reached TripService.driverLocationUpdates.");
 
             DriverLocationEvent driverLocationEvent = DriverLocationEvent.parseFrom(message);
+            String messageId = driverLocationEvent.getMessageId();
+
+            if (alreadyProcessed(DRIVER_UPDATES_KAFKA_DEDUP_KEY_PREFIX, messageId)) {
+                log.info("TripService.driverLocationUpdates: Duplicate Kafka message detected. Skipping. messageId={}",
+                        messageId);
+                acknowledgment.acknowledge();
+                return;
+            }
+
             long driverId = driverLocationEvent.getDriverId();
             String oldStation = driverLocationEvent.getOldStation();
             String nextStation = driverLocationEvent.getNextStation();
             int timeToNextStation =  driverLocationEvent.getTimeToNextStation();
+            // Manually acknowledge
+            markProcessed(DRIVER_UPDATES_KAFKA_DEDUP_KEY_PREFIX, messageId);
             acknowledgment.acknowledge();
 
             // Send driver location to all associated riders
