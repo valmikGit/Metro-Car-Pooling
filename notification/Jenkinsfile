@@ -2,15 +2,15 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDS = credentials('dockerhub-creds')  // Jenkins credentials (notificationname + password)
+        DOCKERHUB_CREDS = credentials('dockerhub-creds')
         IMAGE_NAME = "notification_microservice"
         IMAGE_TAG = "latest"
         DOCKER_IMAGE = "${DOCKERHUB_CREDS_USR}/${IMAGE_NAME}:${IMAGE_TAG}"
-        EMAIL_ID_TO_SEND = "valmik.belgaonkar@iiitb.ac.in"
+        EMAIL_IDS_TO_SEND = "valmik.belgaonkar@iiitb.ac.in,vaibhav.bajoriya@iiitb.ac.in,abhinav.deshpande@iiitb.ac.in,krish.dave@iiitb.ac.in"
     }
 
     triggers {
-        pollSCM('* * * * *')  // or GitHub webhook
+        githubPush()  // Trigger on GitHub webhook push events
     }
 
     stages {
@@ -23,7 +23,6 @@ pipeline {
         stage('Check Changes') {
             when {
                 expression {
-                    // Check if any file in 'notification' changed
                     def changes = sh(
                         script: "git diff --name-only HEAD~1 HEAD | grep '^notification/' || true",
                         returnStdout: true
@@ -103,7 +102,7 @@ pipeline {
         success {
             echo "Successfully executed the pipeline"
             emailext(
-                to: "${EMAIL_ID_TO_SEND}",
+                to: "${EMAIL_IDS_TO_SEND}",
                 subject: "SUCCESS: Pipeline ${env.JOB_NAME} #${env.BUILD_NUMBER}",
                 body: """
                 <b>Build successful!</b><br>
@@ -117,7 +116,7 @@ pipeline {
         failure {
             echo "Failed to execute the pipeline"
             emailext(
-                to: "${EMAIL_ID_TO_SEND}",
+                to: "${EMAIL_IDS_TO_SEND}",
                 subject: "FAILURE: Pipeline ${env.JOB_NAME} #${env.BUILD_NUMBER}",
                 body: """
                 <b>Build failed!</b><br>
