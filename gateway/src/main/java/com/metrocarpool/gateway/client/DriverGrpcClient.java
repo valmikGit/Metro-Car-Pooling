@@ -16,49 +16,53 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class DriverGrpcClient {
 
-    private final DriverServiceGrpc.DriverServiceBlockingStub stub;
-
     @Autowired
     private DiscoveryClient discoveryClient;
 
     public DriverGrpcClient() {
         // We’ll initialize stub later once DiscoveryClient is available
-        this.stub = null;
     }
 
-    private DriverServiceGrpc.DriverServiceBlockingStub getStub() {
-        log.info("Reached DriverGrpcClient.getStub.");
-
-        // Discover driver service from Eureka
-        ServiceInstance instance = discoveryClient.getInstances("driver")
-                .stream()
-                .findFirst()
-                .orElseThrow(() -> new RuntimeException("Driver service not found in Eureka"));
-
+    private ManagedChannel createChannel(ServiceInstance instance) {
         String host = instance.getHost();
         int port = getGrpcPort(instance);
-
-        ManagedChannel channel = ManagedChannelBuilder.forAddress(host, port)
+        return ManagedChannelBuilder.forAddress(host, port)
                 .usePlaintext()
                 .build();
+    }
 
+    private DriverServiceGrpc.DriverServiceBlockingStub getStub(ManagedChannel channel) {
         return DriverServiceGrpc.newBlockingStub(channel);
     }
 
     public DriverStatusResponse postDriverInfo(PostDriverDTO postDriverDTO) {
         log.info("Reached DriverGrpcClient.postDriverInfo.");
 
-        // Use discovered stub instead of static one
-        DriverServiceGrpc.DriverServiceBlockingStub stub = getStub();
+        ServiceInstance instance = discoveryClient.getInstances("driver")
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Driver service not found in Eureka"));
 
-        PostDriver postDriver = PostDriver.newBuilder()
-                .setDriverId(postDriverDTO.getDriverId())
-                .addAllRouteStations(postDriverDTO.getRouteStations())
-                .setFinalDestination(postDriverDTO.getFinalDestination())
-                .setAvailableSeats(postDriverDTO.getAvailableSeats())
-                .build();
+        ManagedChannel channel = createChannel(instance);
+        try {
+            DriverServiceGrpc.DriverServiceBlockingStub stub = getStub(channel);
 
-        return stub.postDriverInfo(postDriver);
+            PostDriver postDriver = PostDriver.newBuilder()
+                    .setDriverId(postDriverDTO.getDriverId())
+                    .addAllRouteStations(postDriverDTO.getRouteStations())
+                    .setFinalDestination(postDriverDTO.getFinalDestination())
+                    .setAvailableSeats(postDriverDTO.getAvailableSeats())
+                    .build();
+
+            return stub.postDriverInfo(postDriver);
+        } catch (Exception e) {
+            log.error("DriverGrpcClient.postDriverInfo: Error while posting driver info.", e);
+            return DriverStatusResponse.newBuilder()
+                    .setStatus(false)
+                    .build();
+        } finally {
+            channel.shutdown();
+        }
     }
 
     private int getGrpcPort(ServiceInstance instance) {

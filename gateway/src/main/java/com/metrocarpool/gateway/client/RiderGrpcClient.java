@@ -16,56 +16,57 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class RiderGrpcClient {
 
-    private final RiderServiceGrpc.RiderServiceBlockingStub stub;
-
     @Autowired
     private DiscoveryClient discoveryClient;
 
     public RiderGrpcClient() {
         log.info("Reached RiderGrpcClient.RiderGrpcClient.");
-
-        // Stub will be created lazily once DiscoveryClient is available
-        this.stub = null;
     }
 
-    private RiderServiceGrpc.RiderServiceBlockingStub getStub() {
-        log.info("Reached RiderGrpcClient.RiderServiceBlockingStub.");
-
-        // Discover the "rider" service instance registered in Eureka
-        ServiceInstance instance = discoveryClient.getInstances("rider")
-                .stream()
-                .findFirst()
-                .orElseThrow(() -> new RuntimeException("Rider service not found in Eureka"));
-
+    private ManagedChannel createChannel(ServiceInstance instance) {
         String host = instance.getHost();
         int port = getGrpcPort(instance);
-
-        ManagedChannel channel = ManagedChannelBuilder.forAddress(host, port)
+        return ManagedChannelBuilder.forAddress(host, port)
                 .usePlaintext()
                 .build();
+    }
 
+    private RiderServiceGrpc.RiderServiceBlockingStub getStub(ManagedChannel channel) {
         return RiderServiceGrpc.newBlockingStub(channel);
     }
 
     public RiderStatusResponse postRiderInfo(PostRiderDTO postRiderDTO) {
         log.info("Reached RiderGrpcClient.postRiderInfo.");
 
-        // Use the discovered stub
-        RiderServiceGrpc.RiderServiceBlockingStub stub = getStub();
+        ServiceInstance instance = discoveryClient.getInstances("rider")
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Rider service not found in Eureka"));
 
-        PostRider postRider = PostRider.newBuilder()
-                .setRiderId(postRiderDTO.getRiderId())
-                .setPickUpStation(postRiderDTO.getPickUpStation())
-                .setArrivalTime(postRiderDTO.getArrivalTime())
-                .setDestinationPlace(postRiderDTO.getDestinationPlace())
-                .build();
+        ManagedChannel channel = createChannel(instance);
+        try {
+            RiderServiceGrpc.RiderServiceBlockingStub stub = getStub(channel);
 
-        return stub.postRiderInfo(postRider);
+            PostRider postRider = PostRider.newBuilder()
+                    .setRiderId(postRiderDTO.getRiderId())
+                    .setPickUpStation(postRiderDTO.getPickUpStation())
+                    .setArrivalTime(postRiderDTO.getArrivalTime())
+                    .setDestinationPlace(postRiderDTO.getDestinationPlace())
+                    .build();
+
+            return stub.postRiderInfo(postRider);
+        } catch (Exception e) {
+            log.error("RiderGrpcClient.postRiderInfo: Error while posting rider info", e);
+            return RiderStatusResponse.newBuilder()
+                    .setStatus(false)
+                    .build();
+        } finally {
+            channel.shutdown();
+        }
     }
 
     private int getGrpcPort(ServiceInstance instance) {
         log.info("Reached RiderGrpcClient.getGrpcPort.");
-
         String grpcPort = instance.getMetadata().get("grpc.port");
         return grpcPort != null ? Integer.parseInt(grpcPort) : 9090;
     }

@@ -16,33 +16,22 @@ import java.util.Iterator;
 @Slf4j
 public class NotificationGrpcClient {
 
-    private final NotificationServiceGrpc.NotificationServiceBlockingStub stub;
-
     @Autowired
     private DiscoveryClient discoveryClient;
 
     public NotificationGrpcClient() {
         log.info("Reached NotificationGrpcClient.NotificationGrpcClient.");
-
-        // Stub will be created lazily after Eureka discovery
-        this.stub = null;
     }
 
-    private NotificationServiceGrpc.NotificationServiceBlockingStub getStub() {
-        log.info("Reached NotificationGrpcClient.NotificationServiceBlockingStub.");
-        // Discover the "notification" service instance registered in Eureka
-        ServiceInstance instance = discoveryClient.getInstances("notification")
-                .stream()
-                .findFirst()
-                .orElseThrow(() -> new RuntimeException("Notification service not found in Eureka"));
-
+    private ManagedChannel createChannel(ServiceInstance instance) {
         String host = instance.getHost();
         int port = getGrpcPort(instance);
-
-        ManagedChannel channel = ManagedChannelBuilder.forAddress(host, port)
+        return ManagedChannelBuilder.forAddress(host, port)
                 .usePlaintext()
                 .build();
+    }
 
+    private NotificationServiceGrpc.NotificationServiceBlockingStub getStub(ManagedChannel channel) {
         return NotificationServiceGrpc.newBlockingStub(channel);
     }
 
@@ -65,50 +54,106 @@ public class NotificationGrpcClient {
 
     public Flux<RiderDriverMatch> getMatchNotifications(boolean status) {
         log.info("NotificationGrpcClient.getMatchNotifications.");
-        NotificationServiceGrpc.NotificationServiceBlockingStub stub = getStub();
 
-        NotificationInitiation request = NotificationInitiation.newBuilder()
-                .setStatus(status)
-                .build();
+        ServiceInstance instance = discoveryClient.getInstances("notification")
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Notification service not found in Eureka"));
 
-        return createReactiveStream(stub.matchNotificationInitiationPost(request))
-                .share();
+        ManagedChannel channel = createChannel(instance);
+        try {
+            NotificationServiceGrpc.NotificationServiceBlockingStub stub = getStub(channel);
+
+            NotificationInitiation request = NotificationInitiation.newBuilder()
+                    .setStatus(status)
+                    .build();
+
+            return createReactiveStream(stub.matchNotificationInitiationPost(request))
+                    .share();
+        } catch (Exception e) {
+            log.error("NotificationGrpcClient.getMatchNotifications: NotificationGrpcClient.getMatchNotifications.", e);
+            return Flux.empty();
+        } finally {
+            channel.shutdown();
+        }
     }
 
     public Flux<DriverRideCompletion> getDriverCompletionNotifications(boolean status) {
         log.info("NotificationGrpcClient.getDriverCompletionNotifications.");
-        NotificationServiceGrpc.NotificationServiceBlockingStub stub = getStub();
 
-        NotificationInitiation request = NotificationInitiation.newBuilder()
-                .setStatus(status)
-                .build();
+        ServiceInstance instance = discoveryClient.getInstances("notification")
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Notification service not found in Eureka"));
 
-        return createReactiveStream(stub.driverRideCompletionNotificationInitiationPost(request))
-                .share();
+        ManagedChannel channel = createChannel(instance);
+        try {
+            NotificationServiceGrpc.NotificationServiceBlockingStub stub = getStub(channel);
+
+            NotificationInitiation request = NotificationInitiation.newBuilder()
+                    .setStatus(status)
+                    .build();
+
+            return createReactiveStream(stub.driverRideCompletionNotificationInitiationPost(request))
+                    .share();
+        } catch (Exception e) {
+            log.error("NotificationGrpcClient.getDriverCompletionNotifications: NotificationGrpcClient.getDriverCompletionNotifications.", e);
+            return Flux.empty();
+        } finally {
+            channel.shutdown();
+        }
     }
 
     public Flux<RiderRideCompletion> getRiderCompletionNotifications(boolean status) {
         log.info("NotificationGrpcClient.getRiderCompletionNotifications.");
-        NotificationServiceGrpc.NotificationServiceBlockingStub stub = getStub();
 
-        NotificationInitiation request = NotificationInitiation.newBuilder()
-                .setStatus(status)
-                .build();
+        ServiceInstance instance = discoveryClient.getInstances("notification")
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Notification service not found in Eureka"));
 
-        return createReactiveStream(stub.riderRideCompletionNotificationInitiationPost(request))
-                .share();
+        ManagedChannel channel = createChannel(instance);
+        try {
+            NotificationServiceGrpc.NotificationServiceBlockingStub stub = getStub(channel);
+
+            NotificationInitiation request = NotificationInitiation.newBuilder()
+                    .setStatus(status)
+                    .build();
+
+            return createReactiveStream(stub.riderRideCompletionNotificationInitiationPost(request))
+                    .share();
+        } catch (Exception e) {
+            log.error("NotificationGrpcClient.getRiderCompletionNotifications: NotificationGrpcClient.getRiderCompletionNotifications.", e);
+            return Flux.empty();
+        } finally {
+            channel.shutdown();
+        }
     }
 
     public Flux<NotifyRiderDriverLocation> getDriverLocationForRiderNotifications(boolean status) {
         log.info("NotificationGrpcClient.getDriverLocationForRiderNotifications.");
-        NotificationServiceGrpc.NotificationServiceBlockingStub stub = getStub();
 
-        NotificationInitiation request = NotificationInitiation.newBuilder()
-                .setStatus(status)
-                .build();
+        ServiceInstance instance = discoveryClient.getInstances("notification")
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Notification service not found in Eureka"));
 
-        return createReactiveStream(stub.driverLocationForRiderNotificationInitiationPost(request))
-                .share();
+        ManagedChannel channel = createChannel(instance);
+        try {
+            NotificationServiceGrpc.NotificationServiceBlockingStub stub = getStub(channel);
+
+            NotificationInitiation request = NotificationInitiation.newBuilder()
+                    .setStatus(status)
+                    .build();
+
+            return createReactiveStream(stub.driverLocationForRiderNotificationInitiationPost(request))
+                    .share();
+        } catch (Exception e) {
+            log.error("NotificationGrpcClient.getDriverLocationForRiderNotifications: NotificationGrpcClient.getDriverLocationForRiderNotifications.", e);
+            return Flux.empty();
+        } finally {
+            channel.shutdown();
+        }
     }
 
     private int getGrpcPort(ServiceInstance instance) {
