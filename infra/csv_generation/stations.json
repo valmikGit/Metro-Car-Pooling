@@ -1,0 +1,8 @@
+{
+  "threshold": 2,
+  "station_count": 2,
+  "stations": [
+    "p3",
+    "k2"
+  ]
+}

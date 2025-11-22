@@ -1,0 +1,8 @@
+{
+  "total_nodes": 260,
+  "target_percentage": 0.3,
+  "target_count": 78,
+  "mapped_nodes": 76,
+  "chosen_threshold": 2,
+  "selected_station_count": 2
+}
