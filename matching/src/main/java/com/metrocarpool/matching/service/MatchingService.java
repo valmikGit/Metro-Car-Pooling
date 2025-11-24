@@ -111,6 +111,9 @@ public class MatchingService {
             log.error("Unable to acquire lock with retry policy: {} lock key {} timeout milliseconds {} maximum retries {} back off milliseconds. " +
                     "Returning void.", redisDriverLockKey, 5000, 10, 200);
             return;
+        } else {
+            log.info("Acquired lock with retry policy: {} lock key {} timeout milliseconds {} maximum retries {} back off milliseconds. " +
+                    "Returning false", redisDriverLockKey, 5000, 10, 200);
         }
 
         try{

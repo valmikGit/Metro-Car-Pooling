@@ -79,6 +79,9 @@ public class DriverService {
             log.error("Unable to acquire lock with retry policy: {} lock key {} timeout milliseconds {} maximum retries {} back off milliseconds. " +
                             "Returning false", redisDriverLockKey, 5000, 10, 200);
             return false;
+        } else {
+            log.info("Acquired lock with retry policy: {} lock key {} timeout milliseconds {} maximum retries {} back off milliseconds. " +
+                    "Returning false", redisDriverLockKey, 5000, 10, 200);
         }
 
         try {
@@ -141,6 +144,9 @@ public class DriverService {
                     "Returning false", redisDriverLockKey, 5000, 10, 200);
             acknowledgment.acknowledge();
             return;
+        } else {
+            log.info("Acquired lock with retry policy: {} lock key {} timeout milliseconds {} maximum retries {} back off milliseconds. " +
+                    "Returning false", redisDriverLockKey, 5000, 10, 200);
         }
 
         try {
@@ -199,6 +205,9 @@ public class DriverService {
             log.error("Unable to acquire lock with retry policy: {} lock key {} timeout milliseconds {} maximum retries {} back off milliseconds. " +
                     "Returning false", redisDriverLockKey, 5000, 10, 200);
             return;
+        } else {
+            log.info("Acquired lock with retry policy: {} lock key {} timeout milliseconds {} maximum retries {} back off milliseconds. " +
+                    "Returning false", redisDriverLockKey, 5000, 10, 200);
         }
 
         try {
@@ -484,7 +493,18 @@ public class DriverService {
             log.debug("Published driver location event for driver {}: oldStation={}, nextStation={}, tts={}s",
                     driverId, oldStationForEvent, nextStationForEvent, timeToNextStationSec);
 
+        } else {
+            DriverLocationEvent event = DriverLocationEvent.newBuilder()
+                    .setDriverId(driverId)
+                    .setOldStation(oldStationForEvent)
+                    .setNextStation(nextStationForEvent)
+                    .setTimeToNextStation(timeToNextStationSec)
+                    .setAvailableSeats(availableSeats)
+                    .setFinalDestination(finalDestination)
+                    .build();
+            log.info("Driver location: {}", event);
         }
+
         return false; // not evicted
     }
 
@@ -498,6 +518,9 @@ public class DriverService {
             log.error("Unable to acquire lock with retry policy: {} lock key {} timeout milliseconds {} maximum retries {} back off milliseconds. " +
                     "Returning false", redisNearbyLocationsLockKey, 5000, 10, 200);
             return null;
+        } else {
+            log.info("Acquired lock with retry policy: {} lock key {} timeout milliseconds {} maximum retries {} back off milliseconds. " +
+                    "Returning false", redisDriverLockKey, 5000, 10, 200);
         }
 
         try {
@@ -527,6 +550,9 @@ public class DriverService {
         if (lockValue == null) {
             log.error("Unable to acquire lock with retry policy: {} lock key {} timeout milliseconds {} maximum retries {} back off milliseconds. " +
                     "Returning false", redisLocationLocationMapLockKey, 5000, 10, 200);
+        } else {
+            log.info("Acquired lock with retry policy: {} lock key {} timeout milliseconds {} maximum retries {} back off milliseconds. " +
+                    "Returning false", redisDriverLockKey, 5000, 10, 200);
         }
 
         try {
