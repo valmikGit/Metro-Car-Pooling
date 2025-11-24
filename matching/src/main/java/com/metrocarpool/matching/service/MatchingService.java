@@ -181,6 +181,8 @@ public class MatchingService {
 
     @KafkaListener(topics = "driver-updates", groupId = "matching-service")
     public void driverInfoUpdateCache(byte[] message, Acknowledgment ack) {
+        log.info("Reached MatchingService.driverInfoUpdateCache.");
+
         // Try to acquire lock
         String lockValue = tryAcquireLockWithRetry(redisDriverLockKey);
         if (lockValue == null) {
@@ -193,7 +195,6 @@ public class MatchingService {
         }
 
         try{
-            log.info("Reached MatchingService.driverInfoUpdateCache.");
 
             DriverLocationEvent event = DriverLocationEvent.parseFrom(message);
             String messageId = event.getMessageId();
@@ -270,6 +271,8 @@ public class MatchingService {
     @KafkaListener(topics = "rider-requests", groupId = "matching-service")
     public void riderInfoDriverMatchingAlgorithm(byte[] message,
                                                  Acknowledgment acknowledgment) {
+        log.info("Reached MatchingService.riderInfoDriverMatchingAlgorithm.");
+
         // Try to acquire lock
         String lockDriverValue = tryAcquireLockWithRetry(redisDriverLockKey);
         if (lockDriverValue == null) {
@@ -287,7 +290,6 @@ public class MatchingService {
         }
 
         try {
-            log.info("Reached MatchingService.riderInfoDriverMatchingAlgorithm.");
             RiderRequestDriverEvent tempEvent = RiderRequestDriverEvent.parseFrom(message);
             String messageId = tempEvent.getMessageId();
 
