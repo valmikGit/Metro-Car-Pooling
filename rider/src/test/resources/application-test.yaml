@@ -1,0 +1,16 @@
+spring:
+  kafka:
+    bootstrap-servers: ${KAFKA_HOST:localhost}:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
+    topics:
+      rider-requests: rider-requests-test
+  
+  grpc:
+    server:
+      port: 0  # Random port for testing
+
+eureka:
+  client:
+    enabled: false  # Disable Eureka for tests
