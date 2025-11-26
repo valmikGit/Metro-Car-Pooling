@@ -368,6 +368,7 @@ public class DriverService {
                     // We reached final destination during this tick
                     log.info("Driver location: Driver reached final destination: driverId={}, finalDest={}", driverId, prevPlace);
                     DriverRideCompletionEvent event = DriverRideCompletionEvent.newBuilder()
+                            .setMessageId(UUID.randomUUID().toString())
                             .setDriverId(driverId)
                             .build();
 

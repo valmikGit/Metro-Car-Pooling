@@ -20,15 +20,10 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.kafka.support.Acknowledgment;
 import java.time.Duration;
-import java.util.List;
-import java.util.HashMap;
+import java.util.*;
+
 import com.google.protobuf.util.Timestamps;
-import java.util.Queue;
-import java.util.PriorityQueue;
-import java.util.Comparator;
-import java.util.LinkedList;
-import java.util.Objects;
-import java.util.ArrayList;
+
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -408,6 +403,7 @@ public class MatchingService {
                             Timestamp driverArrivalTs = Timestamps.fromMillis(driverArrivalMillis);
 
                             DriverRiderMatchEvent event = DriverRiderMatchEvent.newBuilder()
+                                    .setMessageId(UUID.randomUUID().toString())
                                     .setDriverId(chosenDriver.getDriverId())
                                     .setRiderId(riderId)
                                     .setPickUpStation(pickUpStation)
@@ -608,6 +604,7 @@ public class MatchingService {
                             log.info("Rider waiting queue: Rider popped from waiting queue.");
 
                             DriverRiderMatchEvent event = DriverRiderMatchEvent.newBuilder()
+                                    .setMessageId(UUID.randomUUID().toString())
                                     .setDriverId(chosenDriver.getDriverId())
                                     .setRiderId(rider.getRiderId())
                                     .setPickUpStation(pickUpStation)

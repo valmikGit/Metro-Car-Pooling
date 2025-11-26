@@ -15,10 +15,7 @@ import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Service;
 import org.springframework.kafka.support.Acknowledgment;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -226,6 +223,7 @@ public class TripService {
 
             // 1️⃣ Produce a Kafka event for the driver’s ride completion
             DriverRideCompletionKafka driverRideCompletion = DriverRideCompletionKafka.newBuilder()
+                    .setMessageId(UUID.randomUUID().toString())
                     .setDriverId(driverId)
                     .setEventMessage("Driver Ride Completed")
                     .build();
@@ -245,6 +243,7 @@ public class TripService {
             // 2️⃣ Produce Kafka events for all associated riders
             for (TripCache riderTrip : riderList) {
                 RiderRideCompletionKafka riderRideCompletion = RiderRideCompletionKafka.newBuilder()
+                        .setMessageId(UUID.randomUUID().toString())
                         .setRiderId(riderTrip.getRiderId())
                         .setEventMessage("Rider Ride Completed")
                         .build();
@@ -323,6 +322,7 @@ public class TripService {
 
             for (TripCache riderTrip : riderList) {
                 DriverLocationForRiderEvent event = DriverLocationForRiderEvent.newBuilder()
+                        .setMessageId(UUID.randomUUID().toString())
                         .setDriverId(driverId)
                         .setRiderId(riderTrip.getRiderId())
                         .setTimeToNextStation(timeToNextStation)
