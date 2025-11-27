@@ -29,7 +29,7 @@ export function RideRequestForm({ onSubmit, riderId }: RideRequestFormProps) {
     Object.entries(metroStations).forEach(([key, value]) => {
       // Only add if value is not empty string
       if (value && value !== '') {
-        stations.add(key)
+        stations.add(value)
       }
     })
     

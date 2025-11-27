@@ -3,21 +3,22 @@
 # ============================
 FROM maven:3.9.9-eclipse-temurin-21 AS builder
 
-WORKDIR /app
+WORKDIR /build
 
-# Copy entire source tree (multi-module build)
-COPY . /app
+# ✅ Copy FULL multi-module project
+COPY . .
 
-# Build only the user module
+# ✅ Build only user module (parent is present now)
 RUN mvn -pl user -am clean package -DskipTests
 
 # ============================
 # RUNTIME STAGE
 # ============================
 FROM eclipse-temurin:21-jre-jammy
+
 WORKDIR /app
 
-COPY --from=builder /app/user/target/*.jar user_service.jar
+COPY --from=builder /build/user/target/*.jar user_service.jar
 
 EXPOSE 8081 9095
 

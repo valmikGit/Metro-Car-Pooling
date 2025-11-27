@@ -61,12 +61,14 @@ with f:
 
     total_pairs = N * (N - 1) // 2
 
-    pbar = tqdm(total=total_pairs, desc="Writing CSV pairs")
+    pbar = tqdm(total=total_pairs + N, desc="Writing CSV pairs")
     for i in range(N):
         ni = nodes[i]
-        for j in range(i + 1, N):
+        # Include self-loop (i == j)
+        for j in range(i, N):
             nj = nodes[j]
-            writer.writerow([ni, nj, sample_distance()])
+            dist = 0 if i == j else sample_distance()
+            writer.writerow([ni, nj, dist])
             pbar.update(1)
     pbar.close()
 

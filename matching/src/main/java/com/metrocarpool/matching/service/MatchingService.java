@@ -346,7 +346,9 @@ public class MatchingService {
                     for (String driverDestination : stationMap.keySet()) {
                         // distance check: D[rider destination, driver destination] <= X
                         int distVal = Integer.MAX_VALUE;
-                        if (distances != null && destinationPlace != null) {
+                        if (destinationPlace != null && destinationPlace.equals(driverDestination)) {
+                            distVal = 0;
+                        } else if (distances != null && destinationPlace != null) {
                             HashMap<String, Integer> inner = distances.get(destinationPlace);
                             if (inner != null && inner.containsKey(driverDestination)) {
                                 Integer dv = inner.get(driverDestination);
@@ -367,9 +369,8 @@ public class MatchingService {
                                     } catch (Exception ex) {
                                         driverArrivalMillis = System.currentTimeMillis();
                                     }
-//                                    long diff = Math.abs(riderMillis - driverArrivalMillis);
-                                    long diff = riderMillis - driverArrivalMillis;
-                                    if (diff <= TIME_THRESHOLD_MS && diff >= 0) {
+                                    long diff = Math.abs(riderMillis - driverArrivalMillis);
+                                    if (diff <= TIME_THRESHOLD_MS) {
                                         pq.add(driverCache);
                                     }
                                 }
@@ -549,13 +550,18 @@ public class MatchingService {
                     // Build candidate pool same as in rider handler
                     for (String driverDestination : stationMap.keySet()) {
                         int distVal = Integer.MAX_VALUE;
-                        if (distances != null && destinationPlace != null) {
+                        if (destinationPlace != null && destinationPlace.equals(driverDestination)) {
+                            distVal = 0;
+                        } else if (distances != null && destinationPlace != null) {
                             HashMap<String, Integer> inner = distances.get(destinationPlace);
                             if (inner != null && inner.containsKey(driverDestination)) {
                                 Integer dv = inner.get(driverDestination);
                                 if (dv != null) distVal = dv;
                             }
                         }
+                        
+                        // log.info("Checking driverDest: {}, riderDest: {}, distance: {}", driverDestination, destinationPlace, distVal);
+
                         if (distVal <= DISTANCE_THRESHOLD_UNITS) {
                             List<MatchingDriverCache> driversAtDest = stationMap.get(driverDestination);
                             if (driversAtDest != null) {
@@ -568,9 +574,12 @@ public class MatchingService {
                                     } catch (Exception ex) {
                                         driverArrivalMillis = System.currentTimeMillis();
                                     }
-//                                    long diff = Math.abs(riderMillis - driverArrivalMillis);
-                                    long diff = riderMillis - driverArrivalMillis;
-                                    if (diff <= TIME_THRESHOLD_MS && diff >= 0) {
+                                    long diff = Math.abs(riderMillis - driverArrivalMillis);
+                                    
+                                    // log.info("Driver {}: arrival={}, rider={}, diff={}, threshold={}", 
+                                    //        driverCache.getDriverId(), driverArrivalMillis, riderMillis, diff, TIME_THRESHOLD_MS);
+
+                                    if (diff <= TIME_THRESHOLD_MS) {
                                         pq.add(driverCache);
                                     }
                                 }
