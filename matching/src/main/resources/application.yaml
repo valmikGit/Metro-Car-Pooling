@@ -9,6 +9,7 @@ spring:
     bootstrap-servers: kafka:9092
 
     producer:
+      bootstrap-servers: kafka:9092
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
       # Idempotent Producer Settings
@@ -19,13 +20,15 @@ spring:
         max.in.flight.requests.per.connection: 1
 
     consumer:
+      bootstrap-servers: kafka:9092
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
-      group-id: matching-service
+      group-id: matching-service-v2
+      auto-offset-reset: earliest
       properties:
         spring.json.use.type.headers: false
         # Idempotent Consumer Setting
-        isolation.level: read_committed   # Ensures consumer reads only committed messages
+        # isolation.level: read_committed   # Ensures consumer reads only committed messages
 
     listener:
       ack-mode: manual
@@ -42,6 +45,8 @@ grpc:
 kafka:
   topics:
     rider-driver-match: "rider-driver-match"
+    driver-location-topic: "driver-updates"
+    rider-requests: "rider-requests"
 
 eureka:
   client:
@@ -58,3 +63,9 @@ eureka:
 logstash:
   host: logstash
   port: 5044
+
+logging:
+  level:
+    com.metrocarpool.matching: DEBUG
+    # org.springframework.kafka: DEBUG
+    # org.apache.kafka: DEBUG

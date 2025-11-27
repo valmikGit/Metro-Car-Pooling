@@ -16,8 +16,17 @@ public class RedisConfig {
         template.setConnectionFactory(connectionFactory);
 
         // Use JSON serialization for values, String for keys
+        // Use JSON serialization for values, String for keys
         template.setKeySerializer(new StringRedisSerializer());
-        template.setValueSerializer(new GenericJackson2JsonRedisSerializer());
+        
+        com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
+        objectMapper.activateDefaultTyping(
+                objectMapper.getPolymorphicTypeValidator(),
+                com.fasterxml.jackson.databind.ObjectMapper.DefaultTyping.NON_FINAL,
+                com.fasterxml.jackson.annotation.JsonTypeInfo.As.PROPERTY);
+        
+        template.setValueSerializer(new GenericJackson2JsonRedisSerializer(objectMapper));
 
         // initialize serializers / internal fields
         template.afterPropertiesSet();

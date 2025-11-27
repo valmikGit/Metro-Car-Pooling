@@ -17,7 +17,8 @@ spring:
       bootstrap-servers: kafka:9092
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
-      group-id: driver-service
+      group-id: driver-service-v2
+      auto-offset-reset: earliest
       # Recommended property for JSON Deserialization when using Protobuf
       properties:
         spring.json.use.type.headers: false
@@ -40,6 +41,7 @@ kafka:
   topics:
     driver-location-topic: "driver-updates"
     ride-completion-topic: "trip-completed"
+    rider-driver-match: "rider-driver-match"
 
 #server:
 #  port: 8081
@@ -57,3 +59,7 @@ eureka:
 logstash:
   host: logstash
   port: 5044
+
+logging:
+  level:
+    com.metrocarpool.driver: DEBUG

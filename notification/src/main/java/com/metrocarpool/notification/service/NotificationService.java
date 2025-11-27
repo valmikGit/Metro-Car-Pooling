@@ -56,7 +56,7 @@ public class NotificationService {
     }
     
     // 🧠 This will be called by your Kafka listener whenever a new match event arrives.
-    @KafkaListener(topics = "rider-driver-match", groupId = "notification-service")
+    @KafkaListener(topics = "${kafka.topics.rider-driver-match}", groupId = "${spring.kafka.consumer.group-id}")
     public void publishRiderDriverMatch(byte[] message, Acknowledgment ack) {
         try{
             log.info("Reached NotificationService.publishRiderDriverMatch.");
@@ -96,7 +96,7 @@ public class NotificationService {
     }
 
     // 🧠 This will be called by your Kafka listener whenever a new driver ride completion event arrives.
-    @KafkaListener(topics = "driver-ride-completion", groupId = "notification-service")
+    @KafkaListener(topics = "${kafka.topics.driver-ride-completion}", groupId = "${spring.kafka.consumer.group-id}")
     public void publishDriverRideCompletion(byte[] byteMessage, Acknowledgment ack) {
         try {
             log.info("Reached NotificationService.publishDriverRideCompletion.");
@@ -134,7 +134,7 @@ public class NotificationService {
     }
 
     // 🧠 This will be called by your Kafka listener whenever a new rider ride completion event arrives.
-    @KafkaListener(topics = "rider-ride-completion", groupId = "notification-service")
+    @KafkaListener(topics = "${kafka.topics.rider-ride-completion}", groupId = "${spring.kafka.consumer.group-id}")
     public void publishRiderRideCompletion(byte[] byteMessage, Acknowledgment ack) {
         try{
             log.info("Reached NotificationService.publishRiderRideCompletion.");
@@ -172,7 +172,7 @@ public class NotificationService {
         return riderCompletionSink.asFlux();
     }
 
-    @KafkaListener(topics = "driver-location-rider", groupId = "notification-sevice")
+    @KafkaListener(topics = "${kafka.topics.driver-location-rider}", groupId = "${spring.kafka.consumer.group-id}")
     public void publishDriverLocationForRiderEvent(byte[] byteMessage, Acknowledgment ack) {
         try {
             log.info("Reached NotificationService.publishDriverLocationForRiderEvent.");

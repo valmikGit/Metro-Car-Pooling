@@ -1,0 +1,28 @@
+spring:
+  kafka:
+    bootstrap-servers: ${KAFKA_HOST:localhost}:9092
+    consumer:
+      group-id: matching-service-test
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
+    topics:
+      driver-location-topic: driver-updates-test
+      rider-requests: rider-requests-test
+      rider-driver-match: rider-driver-match-test
+  
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: 6379
+
+  task:
+    scheduling:
+      enabled: false  # Disable scheduling for tests
+
+eureka:
+  client:
+    enabled: false

@@ -1,0 +1,51 @@
+spring:
+  application:
+    name: driver-test
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9093}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
+      properties:
+        enable.idempotence: true
+        acks: all
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
+      group-id: driver-test-group
+      auto-offset-reset: earliest
+      properties:
+        isolation.level: read_committed
+    listener:
+      ack-mode: manual
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  grpc:
+    server:
+      port: 0  # Random port for testing
+  cloud:
+    compatibility-verifier:
+      enabled: false
+
+# Disable Eureka for tests
+eureka:
+  client:
+    enabled: false
+    register-with-eureka: false
+    fetch-registry: false
+
+kafka:
+  topics:
+    driver-location-topic: "driver-updates-test"
+    ride-completion-topic: "trip-completed-test"
+    rider-driver-match: "rider-driver-match-test"
+
+# Disable scheduling for tests
+spring.task.scheduling.enabled: false
+
+logging:
+  level:
+    com.metrocarpool.driver: DEBUG
+    org.testcontainers: INFO

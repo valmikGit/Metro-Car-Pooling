@@ -12,6 +12,6 @@ import lombok.NoArgsConstructor;
 public class RiderWaitingQueueCache {
     private Long riderId;
     private String pickUpStation;
-    private com.google.protobuf.Timestamp arrivalTime;
+    private Long arrivalTime;
     private String destinationPlace;
 }

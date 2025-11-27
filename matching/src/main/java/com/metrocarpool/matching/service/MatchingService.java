@@ -20,15 +20,10 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.kafka.support.Acknowledgment;
 import java.time.Duration;
-import java.util.List;
-import java.util.HashMap;
+import java.util.*;
+
 import com.google.protobuf.util.Timestamps;
-import java.util.Queue;
-import java.util.PriorityQueue;
-import java.util.Comparator;
-import java.util.LinkedList;
-import java.util.Objects;
-import java.util.ArrayList;
+
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -165,12 +160,25 @@ public class MatchingService {
     /**
      * Ensure waiting queue is non-null.
      */
-    @SuppressWarnings("unchecked")
     private Queue<RiderWaitingQueueCache> ensureWaitingQueue() {
-        Queue<RiderWaitingQueueCache> riderWaitingQueueCache =
-                (Queue<RiderWaitingQueueCache>) redisWaitingQueueTemplate.opsForValue().get(MATCHING_WAITING_QUEUE_KEY);
-        if (riderWaitingQueueCache == null) {
-            riderWaitingQueueCache = new LinkedList<>();
+        Object rawQueue = redisWaitingQueueTemplate.opsForValue().get(MATCHING_WAITING_QUEUE_KEY);
+        Queue<RiderWaitingQueueCache> riderWaitingQueueCache = new LinkedList<>();
+
+        if (rawQueue instanceof List) {
+            List<?> list = (List<?>) rawQueue;
+            for (Object item : list) {
+                try {
+                    RiderWaitingQueueCache cacheItem;
+                    if (item instanceof String) {
+                        cacheItem = objectMapper.readValue((String) item, RiderWaitingQueueCache.class);
+                    } else {
+                        cacheItem = objectMapper.convertValue(item, RiderWaitingQueueCache.class);
+                    }
+                    riderWaitingQueueCache.add(cacheItem);
+                } catch (Exception e) {
+                    log.error("Failed to convert item to RiderWaitingQueueCache: {}", item, e);
+                }
+            }
         }
         return riderWaitingQueueCache;
     }
@@ -179,7 +187,7 @@ public class MatchingService {
     // Kafka listeners and scheduled job
     // -----------------------
 
-    @KafkaListener(topics = "driver-updates", groupId = "matching-service")
+    @KafkaListener(topics = "${kafka.topics.driver-location-topic}", groupId = "${spring.kafka.consumer.group-id}")
     public void driverInfoUpdateCache(byte[] message, Acknowledgment ack) {
         // Try to acquire lock
         String lockValue = tryAcquireLockWithRetry(redisDriverLockKey);
@@ -259,6 +267,9 @@ public class MatchingService {
                 matchingCache1.put(finalDestination, matchingDriverCacheList1);
                 allMatchingCache.put(nextStation, matchingCache1);
                 redisDriverTemplate.opsForValue().set(MATCHING_DRIVER_CACHE_KEY, allMatchingCache);
+            } else {
+                log.info("Skipping cache update for driver {}: nextStation or finalDestination is empty. nextStation={}, finalDestination={}",
+                        driverId, nextStation, finalDestination);
             }
         } catch (InvalidProtocolBufferException e) {
             log.error("Failed to parse DriverLocationEvent message: {}", e.getMessage());
@@ -267,7 +278,7 @@ public class MatchingService {
         }
     }
 
-    @KafkaListener(topics = "rider-requests", groupId = "matching-service")
+    @KafkaListener(topics = "${kafka.topics.rider-requests}", groupId = "${spring.kafka.consumer.group-id}")
     public void riderInfoDriverMatchingAlgorithm(byte[] message,
                                                  Acknowledgment acknowledgment) {
         // Try to acquire lock
@@ -392,6 +403,7 @@ public class MatchingService {
                             Timestamp driverArrivalTs = Timestamps.fromMillis(driverArrivalMillis);
 
                             DriverRiderMatchEvent event = DriverRiderMatchEvent.newBuilder()
+                                    .setMessageId(UUID.randomUUID().toString())
                                     .setDriverId(chosenDriver.getDriverId())
                                     .setRiderId(riderId)
                                     .setPickUpStation(pickUpStation)
@@ -445,9 +457,9 @@ public class MatchingService {
 
                 riderWaitingQueueCache.add(RiderWaitingQueueCache.builder()
                         .riderId(riderId)
-                        .arrivalTime(Timestamps.fromMillis(System.currentTimeMillis()))
-                        .destinationPlace(destinationPlace)
                         .pickUpStation(pickUpStation)
+                        .arrivalTime(Timestamps.toMillis(arrivalTime))
+                        .destinationPlace(destinationPlace)
                         .build()
                 );
 
@@ -517,7 +529,7 @@ public class MatchingService {
             long riderMillis = 0L;
             try {
                 if (rider.getArrivalTime() != null) {
-                    riderMillis = Timestamps.toMillis(rider.getArrivalTime());
+                    riderMillis = rider.getArrivalTime();
                 } else {
                     riderMillis = System.currentTimeMillis();
                 }
@@ -592,6 +604,7 @@ public class MatchingService {
                             log.info("Rider waiting queue: Rider popped from waiting queue.");
 
                             DriverRiderMatchEvent event = DriverRiderMatchEvent.newBuilder()
+                                    .setMessageId(UUID.randomUUID().toString())
                                     .setDriverId(chosenDriver.getDriverId())
                                     .setRiderId(rider.getRiderId())
                                     .setPickUpStation(pickUpStation)
@@ -641,7 +654,7 @@ public class MatchingService {
 
             // If not matched, push rider back to waiting queue (end of queue)
             if (!matched) {
-                rider.setArrivalTime(Timestamps.fromMillis(System.currentTimeMillis()));
+                rider.setArrivalTime(System.currentTimeMillis());
                 riderWaitingQueueCache.add(rider);
                 log.info("Rider waiting queue: Rider added to waiting queue.");
             }

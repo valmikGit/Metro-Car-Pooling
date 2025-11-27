@@ -8,8 +8,11 @@ spring:
   kafka:
     bootstrap-servers: kafka:9092
 
+    listener:
+      ack-mode: MANUAL_IMMEDIATE
+
     consumer:
-      group-id: trip-group
+      group-id: trip-group-v2
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
       auto-offset-reset: earliest
@@ -43,6 +46,9 @@ kafka:
     rider-ride-completion: "rider-ride-completion"
     driver-ride-completion: "driver-ride-completion"
     driver-location-rider: "driver-location-rider"
+    ride-completion-topic: "trip-completed"
+    driver-location-topic: "driver-updates"
+    rider-driver-match: "rider-driver-match"
 
 eureka:
   client:
@@ -59,3 +65,7 @@ eureka:
 logstash:
   host: logstash
   port: 5044
+
+logging:
+  level:
+    com.metrocarpool.trip: DEBUG

@@ -8,10 +8,8 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Service;
 
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 @Service
@@ -39,6 +37,7 @@ public class RiderService {
 
             // ✅ Construct the event payload
             RiderRequestDriverEvent riderRequestDriverEvent = RiderRequestDriverEvent.newBuilder()
+                    .setMessageId(UUID.randomUUID().toString())
                     .setRiderId(riderId)
                     .setPickUpStation(pickUpStation)
                     .setArrivalTime(arrivalTime)
