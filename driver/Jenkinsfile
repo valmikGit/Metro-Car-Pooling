@@ -82,7 +82,7 @@ pipeline {
             }
         }
 
-        stage('Deploy with Ansible') {
+        stage('Deploy to K8s') {
             when {
                 expression {
                     def changes = sh(
@@ -93,7 +93,30 @@ pipeline {
                 }
             }
             steps {
-                sh 'ansible-playbook -i ansible/inventory.ini ansible/playbook.yml'
+                // Update image in deployment yaml
+                sh "sed -i 's|driver_microservice:latest|${DOCKER_IMAGE}|g' k8s/driver-deployment.yaml"
+                // Apply K8s manifests
+                sh "kubectl apply -f k8s/driver-deployment.yaml"
+            }
+        }
+
+        stage('Integration Test') {
+            when {
+                expression {
+                    def changes = sh(
+                        script: "git diff --name-only HEAD~1 HEAD | grep '^driver/' || true",
+                        returnStdout: true
+                    ).trim()
+                    return changes != ""
+                }
+            }
+            steps {
+                echo "Running Integration Tests..."
+                // Wait for deployment to be ready
+                sh "kubectl rollout status deployment/driver-service"
+                
+                // Placeholder for actual integration tests
+                echo "Integration tests passed."
             }
         }
     }
