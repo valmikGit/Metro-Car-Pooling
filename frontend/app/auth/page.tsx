@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { apiRequest } from '@/lib/api-config'
 
-export default function AuthPage() {
+function AuthContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [role, setRole] = useState<'driver' | 'rider'>('driver')
@@ -72,7 +72,7 @@ export default function AuthPage() {
     }
 
     try {
-      const endpoint = isLogin 
+      const endpoint = isLogin
         ? `/api/user/login-${role}`
         : `/api/user/add-${role}`
 
@@ -91,8 +91,8 @@ export default function AuthPage() {
         method: 'POST',
         body: JSON.stringify(payload),
       })
-        const data = await response.json()
-        console.log(data)
+      const data = await response.json()
+      console.log(data)
 
       if (isLogin) {
         // Login flow - expects token in response
@@ -101,9 +101,9 @@ export default function AuthPage() {
           localStorage.setItem('username', formData.username)
           localStorage.setItem('role', role)
           localStorage.setItem('Id', data.userId)
-          
+
           setSuccess('Login successful! Redirecting...')
-          
+
           // Redirect to appropriate dashboard
           setTimeout(() => {
             router.push(`/${role}`)
@@ -115,7 +115,7 @@ export default function AuthPage() {
         // Signup flow - expects STATUS_CODE
         if (data.status_CODE === 200) {
           setSuccess('Account created successfully! Please login.')
-          
+
           // Clear form and switch to login
           setFormData({
             username: '',
@@ -123,7 +123,7 @@ export default function AuthPage() {
             confirmPassword: '',
             licenseId: '',
           })
-          
+
           setTimeout(() => {
             setIsLogin(true)
             setSuccess('')
@@ -167,11 +167,10 @@ export default function AuthPage() {
                 setError('')
                 setSuccess('')
               }}
-              className={`flex-1 py-2 px-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
-                role === 'driver'
+              className={`flex-1 py-2 px-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${role === 'driver'
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-muted text-muted-foreground hover:bg-muted/80'
-              }`}
+                }`}
             >
               <span className="text-lg">🚗</span>
               Driver
@@ -188,11 +187,10 @@ export default function AuthPage() {
                 setError('')
                 setSuccess('')
               }}
-              className={`flex-1 py-2 px-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
-                role === 'rider'
+              className={`flex-1 py-2 px-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${role === 'rider'
                   ? 'bg-accent text-accent-foreground'
                   : 'bg-muted text-muted-foreground hover:bg-muted/80'
-              }`}
+                }`}
             >
               <span className="text-lg">👤</span>
               Rider
@@ -207,11 +205,10 @@ export default function AuthPage() {
                 setError('')
                 setSuccess('')
               }}
-              className={`flex-1 py-2 font-medium transition-colors ${
-                isLogin
+              className={`flex-1 py-2 font-medium transition-colors ${isLogin
                   ? 'text-primary border-b-2 border-primary'
                   : 'text-muted-foreground'
-              }`}
+                }`}
             >
               Login
             </button>
@@ -221,11 +218,10 @@ export default function AuthPage() {
                 setError('')
                 setSuccess('')
               }}
-              className={`flex-1 py-2 font-medium transition-colors ${
-                !isLogin
+              className={`flex-1 py-2 font-medium transition-colors ${!isLogin
                   ? 'text-primary border-b-2 border-primary'
                   : 'text-muted-foreground'
-              }`}
+                }`}
             >
               Sign Up
             </button>
@@ -336,5 +332,13 @@ export default function AuthPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <AuthContent />
+    </Suspense>
   )
 }

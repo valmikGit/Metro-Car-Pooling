@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  frontend-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: frontend-service
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    networks:
+      - infra_default
+
+networks:
+  infra_default:
+    external: true
