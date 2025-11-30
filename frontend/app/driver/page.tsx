@@ -5,27 +5,128 @@ import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/card'
 import { DriverNav } from '@/components/driver-nav'
 import { RideOfferForm } from '@/components/ride-offer-form'
-import { DriverNotificationCenter } from '@/components/driver-notification-center'
+import { MatchingModal } from '@/components/matching-modal'
+import { DriverTripView } from '@/components/driver-trip-view'
 import { apiRequest } from '@/lib/api-config'
 
-type TabType = 'post-request' | 'notifications'
+type TabType = 'post-offer' | 'matching' | 'trip'
+type RideState = 'idle' | 'waiting' | 'matched' | 'active'
+
+interface MatchData {
+  riderId: number
+  driverId: number
+  driverArrivalTime?: string
+}
 
 export default function DriverPage() {
   const router = useRouter()
   const [authenticated, setAuthenticated] = useState(false)
-  const [activeTab, setActiveTab] = useState<TabType>('post-request')
+  const [activeTab, setActiveTab] = useState<TabType>('post-offer')
+  const [rideState, setRideState] = useState<RideState>('idle')
   const [loading, setLoading] = useState(false)
-  const [disableRequestTab, setDisableRequestTab] = useState(false)
+  const [driverId, setDriverId] = useState<number | null>(null)
 
+  // Match state
+  const [currentMatch, setCurrentMatch] = useState<MatchData | null>(null)
+  const [showMatchModal, setShowMatchModal] = useState(false)
+  const [sseConnected, setSseConnected] = useState(false)
+
+  // Authentication check
   useEffect(() => {
     const token = localStorage.getItem('authToken')
     const role = localStorage.getItem('role')
+    const storedDriverId = localStorage.getItem('userId')
+
     if (!token || role !== 'driver') {
       router.push('/auth?role=driver')
     } else {
       setAuthenticated(true)
+      if (storedDriverId) {
+        setDriverId(parseInt(storedDriverId))
+      }
     }
   }, [router])
+
+  // SSE for match notifications
+  useEffect(() => {
+    if (!authenticated || !driverId || rideState === 'active') return
+
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
+    const eventSource = new EventSource(
+      `${API_BASE_URL}/api/notification/matches?status=true`,
+      { withCredentials: true }
+    )
+
+    eventSource.onopen = () => {
+      console.log('SSE connection opened for driver matches')
+      setSseConnected(true)
+    }
+
+    eventSource.onmessage = (event) => {
+      try {
+        const match: MatchData = JSON.parse(event.data)
+        console.log('Received match:', match)
+
+        // Only process if this match is for current driver
+        if (match.driverId === driverId) {
+          setCurrentMatch(match)
+          setShowMatchModal(true)
+          setRideState('matched')
+        }
+      } catch (error) {
+        console.error('Error processing match notification:', error)
+      }
+    }
+
+    eventSource.onerror = (error) => {
+      console.error('SSE error:', error)
+      setSseConnected(false)
+      eventSource.close()
+    }
+
+    return () => {
+      console.log('Closing match SSE connection')
+      eventSource.close()
+    }
+  }, [authenticated, driverId, rideState])
+
+  // SSE for ride completion
+  useEffect(() => {
+    if (!authenticated || !driverId || rideState !== 'active') return
+
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
+    const eventSource = new EventSource(
+      `${API_BASE_URL}/api/notification/driver-ride-completion?status=true`,
+      { withCredentials: true }
+    )
+
+    eventSource.onopen = () => {
+      console.log('SSE connection opened for driver ride completion')
+    }
+
+    eventSource.onmessage = (event) => {
+      try {
+        const completion = JSON.parse(event.data)
+        console.log('Ride completion received:', completion)
+
+        if (completion.driverId === driverId) {
+          handleRideCompletion(completion.completionMessage)
+        }
+      } catch (error) {
+        console.error('Error processing completion notification:', error)
+      }
+    }
+
+    eventSource.onerror = (error) => {
+      console.error('Completion SSE error:', error)
+      eventSource.close()
+    }
+
+    return () => {
+      console.log('Closing completion SSE connection')
+      eventSource.close()
+    }
+  }, [authenticated, driverId, rideState])
 
   const handleLogout = () => {
     localStorage.removeItem('authToken')
@@ -37,26 +138,24 @@ export default function DriverPage() {
   const handleSubmitOffer = async (offerData: any) => {
     setLoading(true)
     try {
-      const driverId = localStorage.getItem('userId')
-      
       const payload = {
-        driverId: driverId ? parseInt(driverId) : 1,
+        driverId: driverId || 1,
         routeStations: offerData.routeStations,
         finalDestination: offerData.finalDestination,
         availableSeats: offerData.availableSeats
       }
 
-      console.log('Submitting payload:', payload)
+      console.log('Submitting driver offer:', payload)
 
       const response = await apiRequest('/api/driver/driver-info', {
         method: 'POST',
         body: JSON.stringify(payload),
       })
-      console.log(response)
+
       if (response && response.status === 200) {
-        alert('🎉 Ride offer posted successfully!')
-        setActiveTab('notifications')
-        setDisableRequestTab(true)
+        console.log('Ride offer posted successfully')
+        setRideState('waiting')
+        setActiveTab('matching')
       } else {
         alert('❌ Failed to post ride offer. Please try again.')
       }
@@ -66,6 +165,36 @@ export default function DriverPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleAcceptMatch = () => {
+    setShowMatchModal(false)
+    setRideState('active')
+    setActiveTab('trip')
+  }
+
+  const handleRejectMatch = () => {
+    setShowMatchModal(false)
+    setCurrentMatch(null)
+    setRideState('waiting')
+  }
+
+  const handleCompleteRide = async () => {
+    // This will be triggered by backend SSE, but we can also allow manual completion
+    console.log('Completing ride manually')
+    // In a real scenario, you'd call an API to mark the ride as complete
+    // For now, we'll just reset the state
+    handleRideCompletion('Ride completed successfully')
+  }
+
+  const handleRideCompletion = (message: string) => {
+    console.log('Ride completion:', message)
+    alert(`✅ ${message}`)
+
+    // Reset ride state but DO NOT logout
+    setRideState('idle')
+    setCurrentMatch(null)
+    setActiveTab('post-offer')
   }
 
   if (!authenticated) {
@@ -84,42 +213,61 @@ export default function DriverPage() {
       <DriverNav onLogout={handleLogout} />
 
       <main className="max-w-6xl mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold text-primary mb-8">Driver Dashboard</h1>
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="text-3xl font-bold text-primary">Driver Dashboard</h1>
+          {rideState === 'waiting' && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className={`w-2 h-2 rounded-full ${sseConnected ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+              <span className="text-sm font-medium text-blue-700">
+                {sseConnected ? 'Listening for matches...' : 'Connecting...'}
+              </span>
+            </div>
+          )}
+        </div>
 
         {/* Tab Navigation */}
         <div className="flex gap-2 mb-6 border-b border-border">
           <button
-            onClick={() => !disableRequestTab && setActiveTab('post-request')}
-            disabled={disableRequestTab}
-            className={`px-6 py-3 font-medium transition-colors ${
-              activeTab === 'post-request'
+            onClick={() => rideState === 'idle' && setActiveTab('post-offer')}
+            disabled={rideState !== 'idle'}
+            className={`px-6 py-3 font-medium transition-colors ${activeTab === 'post-offer'
                 ? 'text-primary border-b-2 border-primary'
                 : 'text-muted-foreground hover:text-foreground'
-            } ${disableRequestTab ? 'opacity-50 cursor-not-allowed' : ''}`}
+              } ${rideState !== 'idle' ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            Post Driver Request
+            Post Ride Offer
           </button>
           <button
-            onClick={() => setActiveTab('notifications')}
-            className={`px-6 py-3 font-medium transition-colors ${
-              activeTab === 'notifications'
+            onClick={() => setActiveTab('matching')}
+            disabled={rideState === 'idle'}
+            className={`px-6 py-3 font-medium transition-colors ${activeTab === 'matching'
                 ? 'text-primary border-b-2 border-primary'
                 : 'text-muted-foreground hover:text-foreground'
-            }`}
+              } ${rideState === 'idle' ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            Notifications
+            {rideState === 'waiting' ? 'Waiting for Match...' : 'Matching'}
+          </button>
+          <button
+            onClick={() => setActiveTab('trip')}
+            disabled={rideState !== 'active'}
+            className={`px-6 py-3 font-medium transition-colors ${activeTab === 'trip'
+                ? 'text-primary border-b-2 border-primary'
+                : 'text-muted-foreground hover:text-foreground'
+              } ${rideState !== 'active' ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            Active Trip
           </button>
         </div>
 
         {/* Tab Content */}
         <div className="max-w-3xl mx-auto">
-          {activeTab === 'post-request' && (
+          {activeTab === 'post-offer' && rideState === 'idle' && (
             <Card className="p-6">
-              <h2 className="text-xl font-semibold mb-6">Post Driver Request</h2>
+              <h2 className="text-xl font-semibold mb-6">Post Your Ride Offer</h2>
               {loading ? (
                 <div className="text-center py-12">
                   <div className="animate-spin text-4xl mb-4">🚗</div>
-                  <p className="text-muted-foreground">Posting your driver ride request...</p>
+                  <p className="text-muted-foreground">Posting your ride offer...</p>
                 </div>
               ) : (
                 <RideOfferForm onSubmit={handleSubmitOffer} />
@@ -127,13 +275,35 @@ export default function DriverPage() {
             </Card>
           )}
 
-          {activeTab === 'notifications' && (
-            <div>
-              <DriverNotificationCenter />
-            </div>
+          {activeTab === 'matching' && rideState === 'waiting' && (
+            <Card className="p-12 text-center">
+              <div className="text-6xl mb-4 animate-bounce">🔍</div>
+              <h3 className="text-2xl font-bold mb-2">Looking for Riders...</h3>
+              <p className="text-muted-foreground mb-6">
+                We'll notify you when a rider matches your route
+              </p>
+              <div className="flex items-center justify-center gap-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse delay-75"></div>
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse delay-150"></div>
+              </div>
+            </Card>
+          )}
+
+          {activeTab === 'trip' && rideState === 'active' && currentMatch && (
+            <DriverTripView match={currentMatch} onCompleteRide={handleCompleteRide} />
           )}
         </div>
       </main>
+
+      {/* Matching Modal */}
+      <MatchingModal
+        isOpen={showMatchModal}
+        match={currentMatch}
+        role="driver"
+        onAccept={handleAcceptMatch}
+        onReject={handleRejectMatch}
+      />
     </div>
   )
 }
