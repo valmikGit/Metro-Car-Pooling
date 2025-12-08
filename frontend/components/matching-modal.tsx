@@ -14,15 +14,14 @@ interface MatchingModalProps {
     isOpen: boolean
     match: MatchData | null
     role: 'driver' | 'rider'
-    onAccept: () => void
-    onReject: () => void
+    onContinue: () => void
 }
 
-export function MatchingModal({ isOpen, match, role, onAccept, onReject }: MatchingModalProps) {
+export function MatchingModal({ isOpen, match, role, onContinue }: MatchingModalProps) {
     if (!match) return null
 
     return (
-        <Dialog open={isOpen} onOpenChange={(open) => !open && onReject()}>
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onContinue()}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle className="text-2xl flex items-center gap-2">
@@ -71,21 +70,13 @@ export function MatchingModal({ isOpen, match, role, onAccept, onReject }: Match
                     </div>
                 </Card>
 
-                <div className="flex gap-3 mt-4">
+                <div className="mt-4">
                     <Button
-                        onClick={onAccept}
-                        className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                        onClick={onContinue}
+                        className="w-full bg-green-600 hover:bg-green-700 text-white"
                         size="lg"
                     >
-                        ✅ Accept Match
-                    </Button>
-                    <Button
-                        onClick={onReject}
-                        variant="outline"
-                        className="flex-1 border-red-200 text-red-600 hover:bg-red-50"
-                        size="lg"
-                    >
-                        ❌ Decline
+                        🚀 Continue to Trip
                     </Button>
                 </div>
             </DialogContent>

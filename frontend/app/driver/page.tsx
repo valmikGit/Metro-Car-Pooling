@@ -35,14 +35,20 @@ export default function DriverPage() {
   useEffect(() => {
     const token = localStorage.getItem('authToken')
     const role = localStorage.getItem('role')
-    const storedDriverId = localStorage.getItem('Id')
+    const storedDriverId = localStorage.getItem('userId')
+
+    console.log('Auth check - token:', !!token, 'role:', role, 'storedDriverId:', storedDriverId)
 
     if (!token || role !== 'driver') {
       router.push('/auth?role=driver')
     } else {
       setAuthenticated(true)
       if (storedDriverId) {
-        setDriverId(parseInt(storedDriverId))
+        const parsedId = parseInt(storedDriverId, 10)
+        console.log('Setting driverId to:', parsedId)
+        setDriverId(parsedId)
+      } else {
+        console.warn('No userId found in localStorage! User may need to re-login.')
       }
     }
   }, [router])
@@ -69,7 +75,7 @@ export default function DriverPage() {
         console.log('Received match:', match)
 
         // Only process if this match is for current driver
-        if (match.driverId === driverId) {
+        if (Number(match.driverId) === driverId) {
           setCurrentMatch(match)
           setShowMatchModal(true)
           setRideState('matched')
@@ -93,7 +99,14 @@ export default function DriverPage() {
 
   // SSE for ride completion
   useEffect(() => {
-    if (!authenticated || !driverId || rideState !== 'active') return
+    console.log('Driver ride completion SSE effect triggered. State:', { authenticated, driverId, rideState })
+
+    if (!authenticated || !driverId || rideState !== 'active') {
+      console.log('Driver ride completion SSE conditions not met, skipping connection')
+      return
+    }
+
+    console.log('Attempting to connect to driver ride completion SSE endpoint...')
 
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
     const eventSource = new EventSource(
@@ -102,7 +115,7 @@ export default function DriverPage() {
     )
 
     eventSource.onopen = () => {
-      console.log('SSE connection opened for driver ride completion')
+      console.log('✅ SSE connection opened for driver ride completion')
     }
 
     eventSource.onmessage = (event) => {
@@ -110,8 +123,15 @@ export default function DriverPage() {
         const completion = JSON.parse(event.data)
         console.log('Ride completion received:', completion)
 
-        if (completion.driverId === driverId) {
-          handleRideCompletion(completion.completionMessage)
+        if (Number(completion.driverId) === driverId) {
+          console.log('Completion is for this driver, showing alert and resetting state')
+          const message = completion.completionMessage || 'Ride completed successfully!'
+          alert(`✅ ${message}`)
+
+          // Reset ride state but DO NOT logout
+          setRideState('idle')
+          setCurrentMatch(null)
+          setActiveTab('post-offer')
         }
       } catch (error) {
         console.error('Error processing completion notification:', error)
@@ -119,12 +139,12 @@ export default function DriverPage() {
     }
 
     eventSource.onerror = (error) => {
-      console.error('Completion SSE error:', error)
+      console.error('Driver completion SSE error:', error)
       eventSource.close()
     }
 
     return () => {
-      console.log('Closing completion SSE connection')
+      console.log('Closing driver completion SSE connection')
       eventSource.close()
     }
   }, [authenticated, driverId, rideState])
@@ -168,16 +188,10 @@ export default function DriverPage() {
     }
   }
 
-  const handleAcceptMatch = () => {
+  const handleMatchContinue = () => {
     setShowMatchModal(false)
     setRideState('active')
     setActiveTab('trip')
-  }
-
-  const handleRejectMatch = () => {
-    setShowMatchModal(false)
-    setCurrentMatch(null)
-    setRideState('waiting')
   }
 
   const handleCompleteRide = async () => {
@@ -302,8 +316,7 @@ export default function DriverPage() {
         isOpen={showMatchModal}
         match={currentMatch}
         role="driver"
-        onAccept={handleAcceptMatch}
-        onReject={handleRejectMatch}
+        onContinue={handleMatchContinue}
       />
     </div>
   )

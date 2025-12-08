@@ -201,7 +201,7 @@ public class MatchingService {
         }
 
         try{
-            log.info("Reached MatchingService.driverInfoUpdateCache.");
+            log.debug("Reached MatchingService.driverInfoUpdateCache.");
 
             DriverLocationEvent event = DriverLocationEvent.parseFrom(message);
             String messageId = event.getMessageId();
@@ -477,7 +477,7 @@ public class MatchingService {
 
     @Scheduled(cron = "* * * * * *")
     public void cronJobMatchingAlgorithm() {
-         log.info("Reached MatchingService.cronJobMatchingAlgorithm.");
+        // log.info("Reached MatchingService.cronJobMatchingAlgorithm.");
 
         // Try to acquire lock
         String lockDriverValue = tryAcquireLockWithRetry(redisDriverLockKey);

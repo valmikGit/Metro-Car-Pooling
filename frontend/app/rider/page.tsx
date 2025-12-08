@@ -44,14 +44,20 @@ export default function RiderPage() {
   useEffect(() => {
     const token = localStorage.getItem('authToken')
     const role = localStorage.getItem('role')
-    const storedRiderId = localStorage.getItem('Id')
+    const storedRiderId = localStorage.getItem('userId')
+
+    console.log('Auth check - token:', !!token, 'role:', role, 'storedRiderId:', storedRiderId)
 
     if (!token || role !== 'rider') {
       router.push('/auth?role=rider')
     } else {
       setAuthenticated(true)
       if (storedRiderId) {
-        setRiderId(parseInt(storedRiderId))
+        const parsedId = parseInt(storedRiderId, 10)
+        console.log('Setting riderId to:', parsedId)
+        setRiderId(parsedId)
+      } else {
+        console.warn('No userId found in localStorage! User may need to re-login.')
       }
     }
   }, [router])
@@ -84,7 +90,7 @@ export default function RiderPage() {
         const match: MatchData = JSON.parse(event.data)
         console.log('Received match:', match)
 
-        if (riderId === match.riderId) {
+        if (riderId === Number(match.riderId)) {
           const matchWithId = { ...match, riderId: riderId as number }
 
           console.log('Processing match:', matchWithId)
@@ -134,7 +140,7 @@ export default function RiderPage() {
         console.log('Driver location update:', locationData)
 
         // Only process if this update is for current rider
-        if (locationData.riderId === riderId) {
+        if (Number(locationData.riderId) === riderId) {
           setDriverLocation({
             nextStation: locationData.nextStation,
             timeToNextStation: locationData.timeToNextStation
@@ -158,7 +164,14 @@ export default function RiderPage() {
 
   // SSE for ride completion
   useEffect(() => {
-    if (!authenticated || !riderId || rideState !== 'active') return
+    console.log('Ride completion SSE effect triggered. State:', { authenticated, riderId, rideState })
+
+    if (!authenticated || !riderId || rideState !== 'active') {
+      console.log('Ride completion SSE conditions not met, skipping connection')
+      return
+    }
+
+    console.log('Attempting to connect to rider ride completion SSE endpoint...')
 
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
     const eventSource = new EventSource(
@@ -167,7 +180,7 @@ export default function RiderPage() {
     )
 
     eventSource.onopen = () => {
-      console.log('SSE connection opened for rider ride completion')
+      console.log('✅ SSE connection opened for rider ride completion')
     }
 
     eventSource.onmessage = (event) => {
@@ -175,8 +188,10 @@ export default function RiderPage() {
         const completion = JSON.parse(event.data)
         console.log('Ride completion received:', completion)
 
-        if (completion.riderId === riderId) {
-          handleRideCompletion(completion.completionMessage)
+        if (Number(completion.riderId) === riderId) {
+          console.log('Completion is for this rider, triggering handleRideCompletion')
+          setCompletionMessage(completion.completionMessage || 'Ride completed successfully!')
+          setShowCompletionModal(true)
         }
       } catch (error) {
         console.error('Error processing completion notification:', error)
@@ -228,17 +243,10 @@ export default function RiderPage() {
     }
   }
 
-  const handleAcceptMatch = () => {
+  const handleMatchContinue = () => {
     setShowMatchModal(false)
     setRideState('active')
     setActiveTab('trip')
-  }
-
-  const handleRejectMatch = () => {
-    setShowMatchModal(false)
-    setCurrentMatch(null)
-    setDriverLocation(undefined)
-    setRideState('waiting')
   }
 
   const handleRideCompletion = (message: string) => {
@@ -362,8 +370,7 @@ export default function RiderPage() {
         isOpen={showMatchModal}
         match={currentMatch}
         role="rider"
-        onAccept={handleAcceptMatch}
-        onReject={handleRejectMatch}
+        onContinue={handleMatchContinue}
       />
 
       {/* Completion Modal */}

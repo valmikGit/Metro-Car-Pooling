@@ -97,10 +97,19 @@ function AuthContent() {
       if (isLogin) {
         // Login flow - expects token in response
         if (response.ok && data.token) {
+          console.log('Login response:', data)
+          console.log('userId from backend:', data.userId, 'type:', typeof data.userId)
+
           localStorage.setItem('authToken', data.token)
           localStorage.setItem('username', formData.username)
           localStorage.setItem('role', role)
-          localStorage.setItem('userId', data.userId)
+
+          // Ensure userId is stored properly
+          if (data.userId !== undefined && data.userId !== null) {
+            localStorage.setItem('userId', String(data.userId))
+          } else {
+            console.error('WARNING: Backend did not return userId!')
+          }
 
           setSuccess('Login successful! Redirecting...')
 

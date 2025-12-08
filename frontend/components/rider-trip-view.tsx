@@ -75,7 +75,7 @@ export function RiderTripView({ match, driverLocation }: RiderTripViewProps) {
                                 <div className="flex-1">
                                     <p className="text-sm text-muted-foreground">Arriving In</p>
                                     <p className="text-lg font-semibold text-green-700">
-                                        {driverLocation.timeToNextStation} minutes
+                                        {driverLocation.timeToNextStation} seconds
                                     </p>
                                 </div>
                             </div>
