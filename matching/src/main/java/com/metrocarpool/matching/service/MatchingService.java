@@ -201,7 +201,7 @@ public class MatchingService {
         }
 
         try{
-            log.info("Reached MatchingService.driverInfoUpdateCache.");
+            log.debug("Reached MatchingService.driverInfoUpdateCache.");
 
             DriverLocationEvent event = DriverLocationEvent.parseFrom(message);
             String messageId = event.getMessageId();
@@ -298,7 +298,7 @@ public class MatchingService {
         }
 
         try {
-            log.info("Reached MatchingService.riderInfoDriverMatchingAlgorithm.");
+            log.debug("Reached MatchingService.riderInfoDriverMatchingAlgorithm.");
             RiderRequestDriverEvent tempEvent = RiderRequestDriverEvent.parseFrom(message);
             String messageId = tempEvent.getMessageId();
 
@@ -464,7 +464,7 @@ public class MatchingService {
                         .build()
                 );
 
-                log.info("Rider waiting queue: Rider added to waiting queue.");
+                log.debug("Rider waiting queue: Rider added to waiting queue.");
                 redisWaitingQueueTemplate.opsForValue().set(MATCHING_WAITING_QUEUE_KEY, riderWaitingQueueCache);
             }
         } catch (InvalidProtocolBufferException e){
@@ -475,10 +475,8 @@ public class MatchingService {
         }
     }
 
-    @Scheduled(cron = "* * * * * *")
+    @Scheduled(cron = "* * * * * *") 
     public void cronJobMatchingAlgorithm() {
-        // log.info("Reached MatchingService.cronJobMatchingAlgorithm.");
-
         // Try to acquire lock
         String lockDriverValue = tryAcquireLockWithRetry(redisDriverLockKey);
         if (lockDriverValue == null) {
@@ -513,14 +511,21 @@ public class MatchingService {
             Queue<RiderWaitingQueueCache> riderWaitingQueueCache = ensureWaitingQueue();
 
             if (riderWaitingQueueCache == null || riderWaitingQueueCache.isEmpty()) {
-                // nothing to do in this cron tick
+                // nothing to do in this cron tick - no logging to avoid spam
                 return;
             }
+
+            // Log meaningful info about waiting queue
+            log.debug("Cron job: Processing waiting queue with {} rider(s) pending", riderWaitingQueueCache.size());
 
             RiderWaitingQueueCache rider = riderWaitingQueueCache.poll(); // pop first element
             if (rider == null) {
                 return;
             }
+
+            log.info("Cron job: Attempting to match rider {} from {} to {}", 
+                    rider.getRiderId(), rider.getPickUpStation(), rider.getDestinationPlace());
+
 
             boolean matched = false;
             MatchingDriverCache chosenDriver;
@@ -665,8 +670,10 @@ public class MatchingService {
             if (!matched) {
                 rider.setArrivalTime(System.currentTimeMillis());
                 riderWaitingQueueCache.add(rider);
-                log.info("Rider waiting queue: Rider added to waiting queue.");
+                log.info("Cron job: No driver match found for rider {}. Re-added to waiting queue (queue size: {})", 
+                        rider.getRiderId(), riderWaitingQueueCache.size());
             }
+
 
             // update waiting queue in redis
             redisWaitingQueueTemplate.opsForValue().set(MATCHING_WAITING_QUEUE_KEY, riderWaitingQueueCache);

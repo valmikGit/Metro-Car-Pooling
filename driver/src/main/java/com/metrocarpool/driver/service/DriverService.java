@@ -166,7 +166,7 @@ public class DriverService {
             markProcessed(MATCH_FOUND_KAFKA_DEDUP_KEY_PREFIX, messageId);
             acknowledgment.acknowledge();
 
-            log.info("Reached DriverService.matchFoundUpdateCache.");
+            log.debug("Reached DriverService.matchFoundUpdateCache.");
             // Decrement the availableSeats by 1 for this driverId
             Object raw = redisTemplate.opsForValue().get(DRIVER_CACHE_KEY);
             Map<Long, DriverCache> allDriverCacheData = normalizeDriverCache(raw);
@@ -317,7 +317,7 @@ public class DriverService {
 
         if (cache == null) return true;
 
-        log.info("Reached DriverService.processSingleDriverTick for driver ID = {}", driverId);
+        log.debug("Reached DriverService.processSingleDriverTick for driver ID = {}", driverId);
 
         // Defensive checks
         List<String> route = cache.getRoutePlaces();
@@ -550,7 +550,7 @@ public class DriverService {
         }
 
         try {
-            log.info("Reached DriverService.safeReadNearby.");
+            log.debug("Reached DriverService.safeReadNearby.");
             String json = redisStringTemplate.opsForValue().get(NEARBY_STATIONS_CACHE_KEY);
             if (json == null || json.isEmpty()) return new HashMap<>();
             // First parse as generic map to tolerate typed JSON (with "@class")
@@ -582,7 +582,7 @@ public class DriverService {
         }
 
         try {
-            log.info("Reached DriverService.safeReadLocationMap.");
+            log.debug("Reached DriverService.safeReadLocationMap.");
             String json = redisStringTemplate.opsForValue().get(LOCATION_LOCATION_MAP_CACHE_KEY);
             if (json == null || json.isEmpty()) return new HashMap<>();
             Map<String, Object> raw = objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
@@ -619,7 +619,7 @@ public class DriverService {
     }
 
     private int indexOf(List<String> route, String place) {
-        log.info("Reached DriverService.indexOf");
+        log.debug("Reached DriverService.indexOf");
         if (route == null) return -1;
         for (int i = 0; i < route.size(); i++) {
             if (Objects.equals(route.get(i), place)) return i;
@@ -632,7 +632,7 @@ public class DriverService {
      * Tries symmetric lookup: map[a].get(b) or map[b].get(a). Returns Double.POSITIVE_INFINITY if unknown.
      */
     private double getDistanceBetween(String a, String b, Map<String, Map<String, Double>> locationLocationMap) {
-        log.info("Reached DriverService.getDistanceBetween.");
+        log.debug("Reached DriverService.getDistanceBetween.");
         if (a == null || b == null) return Double.POSITIVE_INFINITY;
         if (Objects.equals(a, b)) return 0.0;
         Map<String, Double> inner = locationLocationMap.get(a);
@@ -651,7 +651,7 @@ public class DriverService {
      * Returns Duration in seconds computed as ceil(distance / DISTANCE_PER_TICK * SECONDS_PER_TICK).
      */
     private Duration computeDurationFromDistance(double distance) {
-        log.info("Reached DriverService.computeDurationFromDistance.");
+        log.debug("Reached DriverService.computeDurationFromDistance.");
         if (Double.isInfinite(distance) || distance <= 0) {
             return Duration.ZERO;
         }
@@ -666,7 +666,7 @@ public class DriverService {
      * Returns stationId or empty string if not found.
      */
     private String findNextMetroStationInRoute(String currentNextPlace, List<String> routePlaces, Map<String, String> nearbyStationMap) {
-        log.info("Reached DriverService.findNextMetroStationInRoute.");
+        log.debug("Reached DriverService.findNextMetroStationInRoute.");
         if (routePlaces == null || routePlaces.isEmpty()) return "";
         int startIdx = indexOf(routePlaces, currentNextPlace);
         if (startIdx == -1) startIdx = 0;
@@ -689,7 +689,7 @@ public class DriverService {
                                                      Map<String, Map<String, Double>> locationLocationMap,
                                                      Map<String, String> nearbyStationMap,
                                                      double distanceCovered) {
-        log.info("Reached DriverService.detectPassedMetroStationDuringTick.");
+        log.debug("Reached DriverService.detectPassedMetroStationDuringTick.");
         if (cache == null) return "";
         List<String> route = cache.getRoutePlaces();
         if (route == null || route.isEmpty()) return "";
@@ -723,7 +723,7 @@ public class DriverService {
                                             String nextStationId,
                                             Map<String, Map<String, Double>> locationLocationMap,
                                             Map<String, String> nearbyStationMap) {
-        log.info("Reached DriverService.computeTimeToNextStationSec.");
+        log.debug("Reached DriverService.computeTimeToNextStationSec.");
         if (cache == null || nextStationId == null || nextStationId.isEmpty()) return 0;
 
         // We must find the first place on route that maps to nextStationId, then compute distance from
@@ -779,7 +779,7 @@ public class DriverService {
      * Accepts keys as Long/Integer/String and values as DriverCache or Map (convertible to DriverCache).
      */
     private Map<Long, DriverCache> normalizeDriverCache(Object raw) {
-        log.info("Reached DriverService.normalizeDriverCache.");
+        log.debug("Reached DriverService.normalizeDriverCache.");
         Map<Long, DriverCache> out = new HashMap<>();
         if (!(raw instanceof Map<?, ?> rawMap)) return out;
         for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
@@ -802,7 +802,7 @@ public class DriverService {
     }
 
     private Long parseLongKey(Object key) {
-        log.info("Reached DriverService.parseLongKey.");
+        log.debug("Reached DriverService.parseLongKey.");
         if (key instanceof Long l) return l;
         if (key instanceof Integer i) return i.longValue();
         if (key instanceof String s) {
