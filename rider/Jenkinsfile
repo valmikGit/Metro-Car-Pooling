@@ -11,10 +11,8 @@ pipeline {
         IMAGE_NAME = "rider_microservice"
         IMAGE_TAG = "latest"
         DOCKER_IMAGE = "${DOCKERHUB_CREDS_USR}/${IMAGE_NAME}:${IMAGE_TAG}"
-        EMAIL_IDS_TO_SEND = "valmik.belgaonkar@iiitb.ac.in,vaibhav.bajoriya@iiitb.ac.in,abhinav.deshpande@iiitb.ac.in,krish.dave@iiitb.ac.in"
+        EMAIL_IDS_TO_SEND = "work.abhinav.work@gmail.com"
     }
-
-    // Triggered by master pipeline - no direct webhook trigger
 
     stages {
         stage('Checkout') {

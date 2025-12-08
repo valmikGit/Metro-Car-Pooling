@@ -10,7 +10,7 @@ pipeline {
 
     environment {
         DOCKERHUB_CREDS = credentials('dockerhub-creds')
-        EMAIL_IDS_TO_SEND = "valmik.belgaonkar@iiitb.ac.in,vaibhav.bajoriya@iiitb.ac.in,abhinav.deshpande@iiitb.ac.in,krish.dave@iiitb.ac.in"
+        EMAIL_IDS_TO_SEND = "vaibhav.bajoriya@iiitb.ac.in"
         GIT_REPO = 'https://github.com/valmikGit/Metro-Car-Pooling.git'
     }
 
