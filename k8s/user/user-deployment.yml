@@ -26,12 +26,19 @@ spec:
               value: user
 
             # Postgres connection
+            # Postgres connection
             - name: SPRING_DATASOURCE_URL
-              value: jdbc:postgresql://postgres:5432/metrocarpool
+              value: jdbc:postgresql://metro-db.metro.svc:5432/metrocarpool
             - name: SPRING_DATASOURCE_USERNAME
-              value: postgres
+              valueFrom:
+                secretKeyRef:
+                  name: metro-user.metro-db.credentials.postgresql.acid.zalan.do
+                  key: username
             - name: SPRING_DATASOURCE_PASSWORD
-              value: postgres
+              valueFrom:
+                secretKeyRef:
+                  name: metro-user.metro-db.credentials.postgresql.acid.zalan.do
+                  key: password
 
             # Eureka
             - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
