@@ -137,26 +137,23 @@ pipeline {
                 // Apply namespace first
                 sh "kubectl apply -f k8s/namespace.yaml || true"
                 
-                // Deploy infrastructure components (order matters: zookeeper before kafka)
+                // Deploy core infrastructure components
                 sh """
                     kubectl apply -f k8s/redis/
                     kubectl apply -f k8s/postgres/
-                    kubectl apply -f k8s/zookeeper/
+                    kubectl apply -f k8s/elasticsearch/
                 """
                 
-                // Wait for Zookeeper to be ready before Kafka
-                echo "Waiting for Zookeeper to be ready..."
-                sh "kubectl rollout status deployment/zookeeper -n metro --timeout=120s || true"
-                sh "sleep 10"
-                
-                // Deploy Kafka after Zookeeper is ready
+                // Deploy Strimzi Kafka (KRaft mode - no Zookeeper needed)
+                echo "Deploying Strimzi Kafka..."
                 sh "kubectl apply -f k8s/kafka/"
                 
-                // Deploy remaining infrastructure
-                sh """
-                    kubectl apply -f k8s/elasticsearch/
-                    kubectl apply -f k8s/registry/
-                """
+                // Wait for Strimzi Kafka to be ready
+                echo "Waiting for Strimzi Kafka cluster to be ready..."
+                sh "kubectl wait kafka/metro-kafka --for=condition=Ready --timeout=300s -n metro || echo 'Kafka still initializing...'"
+                
+                // Deploy registry
+                sh "kubectl apply -f k8s/registry/"
                 
                 // Deploy Ingress for routing
                 sh "kubectl apply -f k8s/ingress.yaml"
@@ -166,13 +163,8 @@ pipeline {
                 sh """
                     kubectl rollout status deployment/redis -n metro --timeout=120s || true
                     kubectl rollout status deployment/postgres -n metro --timeout=120s || true
+                    kubectl rollout status deployment/registry -n metro --timeout=120s || true
                 """
-                
-                // Wait extra time for Kafka to fully initialize
-                echo "Waiting 60 seconds for Kafka to fully initialize..."
-                sh "sleep 60"
-                
-                sh "kubectl rollout status deployment/kafka -n metro --timeout=120s || true"
                 
                 echo "Infrastructure deployment complete"
             }
