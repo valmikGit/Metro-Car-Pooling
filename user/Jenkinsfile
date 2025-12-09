@@ -11,7 +11,7 @@ pipeline {
         IMAGE_NAME = "user_microservice"
         IMAGE_TAG = "latest"
         DOCKER_IMAGE = "${DOCKERHUB_CREDS_USR}/${IMAGE_NAME}:${IMAGE_TAG}"
-        EMAIL_IDS_TO_SEND = ""
+        EMAIL_IDS_TO_SEND = "vaibhav.bajoriya@iiitb.ac.in"
     }
 
     stages {
