@@ -8,7 +8,6 @@ frontend/.next/
 frontend/out/
 frontend/build/
 frontend/dist/
-frontend/package-lock.json
 frontend/yarn.lock
 frontend/pnpm-lock.yaml
 frontend/.env

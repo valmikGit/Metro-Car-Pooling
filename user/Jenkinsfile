@@ -62,7 +62,7 @@ pipeline {
         stage('Verify Deployment') {
             steps {
                 echo "Verifying deployment..."
-                sh "kubectl rollout status deployment/user-service -n metro --timeout=180s"
+                sh "kubectl rollout status deployment/user -n metro --timeout=180s"
                 echo "User service deployment successful!"
             }
         }
