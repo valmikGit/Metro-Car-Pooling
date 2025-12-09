@@ -21,23 +21,23 @@ pipeline {
             }
         }
 
-        stage('Install Dependencies') {
-            steps {
-                echo "Installing npm dependencies..."
-                dir('frontend') {
-                    sh "npm ci"
-                }
-            }
-        }
+        // stage('Install Dependencies') {
+        //     steps {
+        //         echo "Installing npm dependencies..."
+        //         dir('frontend') {
+        //             sh "npm ci"
+        //         }
+        //     }
+        // }
 
-        stage('Build') {
-            steps {
-                echo "Building Next.js application..."
-                dir('frontend') {
-                    sh "npm run build"
-                }
-            }
-        }
+        // stage('Build') {
+        //     steps {
+        //         echo "Building Next.js application..."
+        //         dir('frontend') {
+        //             sh "npm run build"
+        //         }
+        //     }
+        // }
 
         stage('Docker Build') {
             steps {
