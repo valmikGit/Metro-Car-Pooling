@@ -7,6 +7,8 @@ pipeline {
     }
 
     environment {
+        // ✅ Add Homebrew path so Jenkins can find 'mvn'
+        PATH = "/opt/homebrew/bin:$PATH"
         DOCKERHUB_CREDS = credentials('dockerhub-creds')
         IMAGE_NAME = "driver_microservice"
         IMAGE_TAG = "latest"
