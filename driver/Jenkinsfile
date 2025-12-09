@@ -38,7 +38,7 @@ pipeline {
         stage('Docker Build') {
             steps {
                 echo "Building Docker image..."
-                sh "docker build -t ${DOCKER_IMAGE} driver/"
+                sh "docker build -f driver/Dockerfile -t ${DOCKER_IMAGE} ."
             }
         }
 

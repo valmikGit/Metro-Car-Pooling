@@ -42,7 +42,7 @@ pipeline {
         stage('Docker Build') {
             steps {
                 echo "Building Docker image..."
-                sh "docker build -t ${DOCKER_IMAGE} frontend/"
+                sh "docker build -f frontend/Dockerfile -t ${DOCKER_IMAGE} ."
             }
         }
 

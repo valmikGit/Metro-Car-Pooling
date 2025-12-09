@@ -38,7 +38,7 @@ pipeline {
         stage('Docker Build') {
             steps {
                 echo "Building Docker image..."
-                sh "docker build -t ${DOCKER_IMAGE} notification/"
+                sh "docker build -f notification/Dockerfile -t ${DOCKER_IMAGE} ."
             }
         }
 
