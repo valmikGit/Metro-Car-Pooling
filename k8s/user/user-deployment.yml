@@ -35,7 +35,7 @@ spec:
 
             # Eureka
             - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
-              value: http://registry:8761/eureka
+              value: "http://registry:8761/eureka"
 
             # Logging
             - name: LOGSTASH_HOST
