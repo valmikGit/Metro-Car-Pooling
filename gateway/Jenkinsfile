@@ -1,16 +1,17 @@
 pipeline {
     agent any
 
+    parameters {
+        string(name: 'GIT_COMMIT', defaultValue: '', description: 'Commit SHA passed from master pipeline')
+        string(name: 'TRIGGERED_BY', defaultValue: 'manual', description: 'Source of trigger')
+    }
+
     environment {
         DOCKERHUB_CREDS = credentials('dockerhub-creds')
         IMAGE_NAME = "gateway_microservice"
         IMAGE_TAG = "latest"
         DOCKER_IMAGE = "${DOCKERHUB_CREDS_USR}/${IMAGE_NAME}:${IMAGE_TAG}"
-        EMAIL_IDS_TO_SEND = "valmik.belgaonkar@iiitb.ac.in,vaibhav.bajoriya@iiitb.ac.in,abhinav.deshpande@iiitb.ac.in,krish.dave@iiitb.ac.in"
-    }
-
-    triggers {
-        githubPush()  // Trigger on GitHub webhook push events
+        EMAIL_IDS_TO_SEND = "valmik.belgaonkar@iiitb.ac.in"
     }
 
     stages {
@@ -20,112 +21,83 @@ pipeline {
             }
         }
 
-        stage('Check Changes') {
-            when {
-                expression {
-                    def changes = sh(
-                        script: "git diff --name-only HEAD~1 HEAD | grep '^gateway/' || true",
-                        returnStdout: true
-                    ).trim()
-                    return changes != ""
-                }
-            }
+        stage('Build') {
             steps {
-                echo "Changes detected in gateway. Running pipeline."
+                echo "Building gateway with Maven..."
+                sh "mvn -f gateway/pom.xml clean package -DskipTests"
             }
         }
 
-        stage('Build') {
-            when {
-                expression {
-                    def changes = sh(
-                        script: "git diff --name-only HEAD~1 HEAD | grep '^gateway/' || true",
-                        returnStdout: true
-                    ).trim()
-                    return changes != ""
-                }
-            }
+        stage('Test') {
             steps {
-                echo "Building gateway with Maven..."
-                sh "mvn -f gateway/pom.xml clean package"
+                echo "Running unit tests..."
+                sh "mvn -f gateway/pom.xml test"
             }
         }
 
         stage('Docker Build') {
-            when {
-                expression {
-                    def changes = sh(
-                        script: "git diff --name-only HEAD~1 HEAD | grep '^gateway/' || true",
-                        returnStdout: true
-                    ).trim()
-                    return changes != ""
-                }
-            }
             steps {
-                sh "docker build -t ${DOCKER_IMAGE} gateway/"
+                echo "Building Docker image..."
+                sh "docker build -f gateway/Dockerfile -t ${DOCKER_IMAGE} ."
             }
         }
 
         stage('Push Docker Image') {
-            when {
-                expression {
-                    def changes = sh(
-                        script: "git diff --name-only HEAD~1 HEAD | grep '^gateway/' || true",
-                        returnStdout: true
-                    ).trim()
-                    return changes != ""
-                }
-            }
             steps {
+                echo "Pushing to DockerHub..."
                 sh "echo ${DOCKERHUB_CREDS_PSW} | docker login -u ${DOCKERHUB_CREDS_USR} --password-stdin"
                 sh "docker push ${DOCKER_IMAGE}"
             }
         }
 
-        stage('Deploy with Ansible') {
-            when {
-                expression {
-                    def changes = sh(
-                        script: "git diff --name-only HEAD~1 HEAD | grep '^gateway/' || true",
-                        returnStdout: true
-                    ).trim()
-                    return changes != ""
-                }
-            }
+        stage('Deploy to K8s') {
             steps {
-                sh 'ansible-playbook -i ansible/inventory.ini ansible/playbook.yml'
+                echo "Deploying to Kubernetes (Minikube)..."
+                sh "kubectl config use-context minikube || echo 'Using current context'"
+                sh "sed -i 's|gateway_microservice:latest|${DOCKER_IMAGE}|g' k8s/gateway-deployment.yaml"
+                sh "kubectl apply -f k8s/gateway-deployment.yaml"
+            }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+                echo "Verifying deployment..."
+                sh "kubectl rollout status deployment/gateway-service -n metro --timeout=180s"
+                echo "Gateway service deployment successful!"
             }
         }
     }
 
     post {
         success {
-            echo "Successfully executed the pipeline"
-            emailext(
-                to: "${EMAIL_IDS_TO_SEND}",
-                subject: "SUCCESS: Pipeline ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                body: """
-                <b>Build successful!</b><br>
-                Job: ${env.JOB_NAME}<br>
-                Build Number: ${env.BUILD_NUMBER}<br>
-                URL: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a>
-                """,
-                mimeType: 'text/html'
-            )
+            echo "Successfully executed the gateway pipeline"
+            // emailext(
+            //     to: "${EMAIL_IDS_TO_SEND}",
+            //     subject: "SUCCESS: Gateway Pipeline #${env.BUILD_NUMBER}",
+            //     body: """
+            //     <b>Build successful!</b><br>
+            //     Job: ${env.JOB_NAME}<br>
+            //     Build Number: ${env.BUILD_NUMBER}<br>
+            //     Triggered By: ${params.TRIGGERED_BY}<br>
+            //     URL: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a>
+            //     """,
+            //     mimeType: 'text/html'
+            // )
         }
         failure {
-            echo "Failed to execute the pipeline"
-            emailext(
-                to: "${EMAIL_IDS_TO_SEND}",
-                subject: "FAILURE: Pipeline ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                body: """
-                <b>Build failed!</b><br>
-                Job: ${env.JOB_NAME}<br>
-                Build Number: ${env.BUILD_NUMBER}<br>
-                URL: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a>
-                """,
-                mimeType: 'text/html'
-            )
+            echo "Failed to execute the gateway pipeline"
+            // emailext(
+            //     to: "${EMAIL_IDS_TO_SEND}",
+            //     subject: "FAILURE: Gateway Pipeline #${env.BUILD_NUMBER}",
+            //     body: """
+            //     <b>Build failed!</b><br>
+            //     Job: ${env.JOB_NAME}<br>
+            //     Build Number: ${env.BUILD_NUMBER}<br>
+            //     Triggered By: ${params.TRIGGERED_BY}<br>
+            //     URL: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a>
+            //     """,
+            //     mimeType: 'text/html'
+            // )
         }
         cleanup {
             cleanWs()

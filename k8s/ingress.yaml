@@ -1,0 +1,116 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: metro-ingress
+  namespace: metro
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Content-Type, Authorization"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    # Enable SSE support
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: metrocar.local
+      http:
+        paths:
+          # Frontend (Next.js)
+          - path: /()(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: frontend-service
+                port:
+                  number: 3000
+          # API Gateway - all /api/* routes
+          - path: /api(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: gateway-service
+                port:
+                  number: 8080
+# ---
+# # Alternative: Direct service access without host-based routing
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: metro-services-ingress
+#   namespace: metro
+#   annotations:
+#     nginx.ingress.kubernetes.io/rewrite-target: /$2
+#     nginx.ingress.kubernetes.io/use-regex: "true"
+# spec:
+#   ingressClassName: nginx
+#   rules:
+#     - http:
+#         paths:
+#           # Gateway API
+#           - path: /gateway(/|$)(.*)
+#             pathType: ImplementationSpecific
+#             backend:
+#               service:
+#                 name: gateway-service
+#                 port:
+#                   number: 8080
+#           # User Service
+#           - path: /user(/|$)(.*)
+#             pathType: ImplementationSpecific
+#             backend:
+#               service:
+#                 name: user-service
+#                 port:
+#                   number: 8084
+#           # Rider Service
+#           - path: /rider(/|$)(.*)
+#             pathType: ImplementationSpecific
+#             backend:
+#               service:
+#                 name: rider-service
+#                 port:
+#                   number: 8083
+#           # Driver Service
+#           - path: /driver(/|$)(.*)
+#             pathType: ImplementationSpecific
+#             backend:
+#               service:
+#                 name: driver-service
+#                 port:
+#                   number: 8085
+#           # Matching Service
+#           - path: /matching(/|$)(.*)
+#             pathType: ImplementationSpecific
+#             backend:
+#               service:
+#                 name: matching-service
+#                 port:
+#                   number: 8082
+#           # Trip Service
+#           - path: /trip(/|$)(.*)
+#             pathType: ImplementationSpecific
+#             backend:
+#               service:
+#                 name: trip-service
+#                 port:
+#                   number: 8086
+#           # Notification Service
+#           - path: /notification(/|$)(.*)
+#             pathType: ImplementationSpecific
+#             backend:
+#               service:
+#                 name: notification-service
+#                 port:
+#                   number: 8087
+#           # Eureka Registry
+#           - path: /registry(/|$)(.*)
+#             pathType: ImplementationSpecific
+#             backend:
+#               service:
+#                 name: registry-service
+#                 port:
+#                   number: 8761

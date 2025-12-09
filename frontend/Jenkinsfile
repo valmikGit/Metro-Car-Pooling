@@ -8,10 +8,10 @@ pipeline {
 
     environment {
         DOCKERHUB_CREDS = credentials('dockerhub-creds')
-        IMAGE_NAME = "matching_microservice"
+        IMAGE_NAME = "frontend_microservice"
         IMAGE_TAG = "latest"
         DOCKER_IMAGE = "${DOCKERHUB_CREDS_USR}/${IMAGE_NAME}:${IMAGE_TAG}"
-        EMAIL_IDS_TO_SEND = ""
+        EMAIL_IDS_TO_SEND = "vaibhav.bajoriya@iiitb.ac.in"
     }
 
     stages {
@@ -21,24 +21,28 @@ pipeline {
             }
         }
 
-        stage('Build') {
-            steps {
-                echo "Building matching with Maven..."
-                sh "mvn -f matching/pom.xml clean package -DskipTests"
-            }
-        }
+        // stage('Install Dependencies') {
+        //     steps {
+        //         echo "Installing npm dependencies..."
+        //         dir('frontend') {
+        //             sh "npm ci"
+        //         }
+        //     }
+        // }
 
-        stage('Test') {
-            steps {
-                echo "Running unit tests..."
-                sh "mvn -f matching/pom.xml test"
-            }
-        }
+        // stage('Build') {
+        //     steps {
+        //         echo "Building Next.js application..."
+        //         dir('frontend') {
+        //             sh "npm run build"
+        //         }
+        //     }
+        // }
 
         stage('Docker Build') {
             steps {
                 echo "Building Docker image..."
-                sh "docker build -f matching/Dockerfile -t ${DOCKER_IMAGE} ."
+                sh "docker build -f frontend/Dockerfile -t ${DOCKER_IMAGE} ."
             }
         }
 
@@ -53,27 +57,30 @@ pipeline {
         stage('Deploy to K8s') {
             steps {
                 echo "Deploying to Kubernetes (Minikube)..."
+                // Ensure we're using minikube context
                 sh "kubectl config use-context minikube || echo 'Using current context'"
-                sh "sed -i 's|matching_microservice:latest|${DOCKER_IMAGE}|g' k8s/matching-deployment.yaml"
-                sh "kubectl apply -f k8s/matching-deployment.yaml"
+                // Update image in deployment yaml
+                sh "sed -i 's|frontend_microservice:latest|${DOCKER_IMAGE}|g' k8s/frontend-deployment.yaml"
+                // Apply K8s manifests
+                sh "kubectl apply -f k8s/frontend-deployment.yaml"
             }
         }
 
         stage('Verify Deployment') {
             steps {
                 echo "Verifying deployment..."
-                sh "kubectl rollout status deployment/matching-service -n metro --timeout=180s"
-                echo "Matching service deployment successful!"
+                sh "kubectl rollout status deployment/frontend-service -n metro --timeout=180s"
+                echo "Frontend deployment successful!"
             }
         }
     }
 
     post {
         success {
-            echo "Successfully executed the matching pipeline"
+            echo "Successfully executed the frontend pipeline"
             // emailext(
             //     to: "${EMAIL_IDS_TO_SEND}",
-            //     subject: "SUCCESS: Matching Pipeline #${env.BUILD_NUMBER}",
+            //     subject: "SUCCESS: Frontend Pipeline #${env.BUILD_NUMBER}",
             //     body: """
             //     <b>Build successful!</b><br>
             //     Job: ${env.JOB_NAME}<br>
@@ -85,10 +92,10 @@ pipeline {
             // )
         }
         failure {
-            echo "Failed to execute the matching pipeline"
+            echo "Failed to execute the frontend pipeline"
             // emailext(
             //     to: "${EMAIL_IDS_TO_SEND}",
-            //     subject: "FAILURE: Matching Pipeline #${env.BUILD_NUMBER}",
+            //     subject: "FAILURE: Frontend Pipeline #${env.BUILD_NUMBER}",
             //     body: """
             //     <b>Build failed!</b><br>
             //     Job: ${env.JOB_NAME}<br>

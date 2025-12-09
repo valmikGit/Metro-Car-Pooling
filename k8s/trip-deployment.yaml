@@ -1,25 +1,24 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: driver-service
+  name: trip-service
   namespace: metro
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: driver-service
+      app: trip-service
   template:
     metadata:
       labels:
-        app: driver-service
+        app: trip-service
     spec:
       containers:
-        - name: driver-service
-          image: driver_microservice:latest # This will be replaced by the pipeline or use a specific tag
+        - name: trip-service
+          image: trip_microservice:latest
           imagePullPolicy: Always
           ports:
-            - containerPort: 8081
-            - containerPort: 9090
+            - containerPort: 8086
           env:
             - name: SPRING_DATA_REDIS_HOST
               value: "redis"
@@ -33,22 +32,25 @@ spec:
               value: "logstash"
             - name: LOGSTASH_PORT
               value: "5044"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: driver-service
+  name: trip-service
   namespace: metro
 spec:
   selector:
-    app: driver-service
+    app: trip-service
   ports:
     - protocol: TCP
-      port: 8085
-      targetPort: 8081
+      port: 8086
+      targetPort: 8086
       name: http
-    - protocol: TCP
-      port: 9090
-      targetPort: 9090
-      name: grpc # Assuming 9090 is for gRPC or similar
   type: ClusterIP

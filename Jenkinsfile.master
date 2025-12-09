@@ -1,0 +1,305 @@
+pipeline {
+    agent any
+
+    parameters {
+        booleanParam(name: 'FORCE_INFRA_UPDATE', defaultValue: false, 
+                     description: 'Force infrastructure stack rebuild in K8s')
+        booleanParam(name: 'DEPLOY_ALL', defaultValue: false,
+                     description: 'Deploy all services regardless of changes')
+    }
+
+    environment {
+        DOCKERHUB_CREDS = credentials('dockerhub-creds')
+        EMAIL_IDS_TO_SEND = ""
+        GIT_REPO = 'https://github.com/valmikGit/Metro-Car-Pooling.git'
+        KUBECONFIG = '/var/lib/jenkins/.kube/config'
+    }
+
+    triggers {
+        githubPush()  // Single webhook entry point for all services
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'main', url: "${GIT_REPO}"
+            }
+        }
+
+        stage('Detect Changes') {
+            steps {
+                script {
+                    // Get list of changed files
+                    def changedFiles = sh(
+                        script: "git diff --name-only HEAD~1 HEAD || echo ''",
+                        returnStdout: true
+                    ).trim()
+                    
+                    echo "Changed files:\n${changedFiles}"
+                    
+                    // Define service mappings (excluding contracts and registry - built separately)
+                    def serviceMappings = [
+                        'driver': 'driver-service',
+                        'rider': 'rider-service',
+                        'user': 'user-service',
+                        'matching': 'matching-service',
+                        'gateway': 'gateway-service',
+                        'trip': 'trip-service',
+                        'notification': 'notification-service',
+                        'frontend': 'frontend-service'
+                    ]
+                    
+                    // Detect which services changed
+                    env.CHANGED_SERVICES = ''
+                    env.INFRA_CHANGED = 'false'
+                    env.CONTRACTS_CHANGED = 'false'
+                    env.REGISTRY_CHANGED = 'false'
+                    
+                    changedFiles.split('\n').each { file ->
+                        // Check for contracts changes
+                        if (file.startsWith('contracts/')) {
+                            env.CONTRACTS_CHANGED = 'true'
+                        }
+                        // Check for registry changes
+                        if (file.startsWith('registry/')) {
+                            env.REGISTRY_CHANGED = 'true'
+                        }
+                        // Check for service changes
+                        serviceMappings.each { folder, jobName ->
+                            if (file.startsWith("${folder}/")) {
+                                if (!env.CHANGED_SERVICES.contains(jobName)) {
+                                    env.CHANGED_SERVICES = env.CHANGED_SERVICES ? "${env.CHANGED_SERVICES},${jobName}" : jobName
+                                }
+                            }
+                        }
+                        // Check for infra changes
+                        if (file.startsWith('infra/') || file.startsWith('k8s/')) {
+                            env.INFRA_CHANGED = 'true'
+                        }
+                    }
+                    
+                    // Handle DEPLOY_ALL parameter
+                    if (params.DEPLOY_ALL) {
+                        env.CONTRACTS_CHANGED = 'true'
+                        env.REGISTRY_CHANGED = 'true'
+                        env.CHANGED_SERVICES = serviceMappings.values().join(',')
+                        echo "DEPLOY_ALL enabled - deploying all services"
+                    }
+                    
+                    echo "Contracts changed: ${env.CONTRACTS_CHANGED}"
+                    echo "Registry changed: ${env.REGISTRY_CHANGED}"
+                    echo "Services to deploy: ${env.CHANGED_SERVICES ?: 'None'}"
+                    echo "Infrastructure changed: ${env.INFRA_CHANGED}"
+                }
+            }
+        }
+
+        stage('Build Contracts') {
+            when {
+                expression {
+                    // Only build contracts when contracts/ folder changes or DEPLOY_ALL
+                    return env.CONTRACTS_CHANGED == 'true' || params.DEPLOY_ALL
+                }
+            }
+            steps {
+                echo "Building contracts module (shared dependency)..."
+                sh "mvn -f contracts/pom.xml clean install -DskipTests"
+                echo "Contracts installed to local Maven repository"
+            }
+        }
+
+        stage('Build Registry') {
+            when {
+                expression {
+                    return env.REGISTRY_CHANGED == 'true' || params.DEPLOY_ALL
+                }
+            }
+            steps {
+                echo "Building and pushing Registry Docker image..."
+                sh "docker build -f registry/Dockerfile -t ${DOCKERHUB_CREDS_USR}/registry_microservice:latest ."
+                sh "echo ${DOCKERHUB_CREDS_PSW} | docker login -u ${DOCKERHUB_CREDS_USR} --password-stdin"
+                sh "docker push ${DOCKERHUB_CREDS_USR}/registry_microservice:latest"
+            }
+        }
+
+        stage('Deploy Infrastructure') {
+            when {
+                expression {
+                    return env.INFRA_CHANGED == 'true' || params.FORCE_INFRA_UPDATE || params.DEPLOY_ALL
+                }
+            }
+            steps {
+                echo "Deploying infrastructure to Kubernetes (Minikube)..."
+                
+                // Ensure we're using minikube context
+                sh "kubectl config use-context minikube || echo 'Using current context'"
+                
+                // Apply namespace first
+                sh "kubectl apply -f k8s/namespace.yaml || true"
+                
+                // Deploy infrastructure components (order matters: zookeeper before kafka)
+                sh """
+                    kubectl apply -f k8s/redis/
+                    kubectl apply -f k8s/postgres/
+                    kubectl apply -f k8s/zookeeper/
+                """
+                
+                // Wait for Zookeeper to be ready before Kafka
+                echo "Waiting for Zookeeper to be ready..."
+                sh "kubectl rollout status deployment/zookeeper -n metro --timeout=120s || true"
+                sh "sleep 10"
+                
+                // Deploy Kafka after Zookeeper is ready
+                sh "kubectl apply -f k8s/kafka/"
+                
+                // Deploy remaining infrastructure
+                sh """
+                    kubectl apply -f k8s/elasticsearch/
+                    kubectl apply -f k8s/registry/
+                """
+                
+                // Deploy Ingress for routing
+                sh "kubectl apply -f k8s/ingress.yaml"
+                
+                // Wait for critical infrastructure to be ready
+                echo "Waiting for infrastructure to be ready..."
+                sh """
+                    kubectl rollout status deployment/redis -n metro --timeout=120s || true
+                    kubectl rollout status deployment/postgres -n metro --timeout=120s || true
+                """
+                
+                // Wait extra time for Kafka to fully initialize
+                echo "Waiting 60 seconds for Kafka to fully initialize..."
+                sh "sleep 60"
+                
+                sh "kubectl rollout status deployment/kafka -n metro --timeout=120s || true"
+                
+                echo "Infrastructure deployment complete"
+            }
+        }
+
+        stage('Deploy Registry to K8s') {
+            when {
+                expression {
+                    return env.REGISTRY_CHANGED == 'true' || params.DEPLOY_ALL
+                }
+            }
+            steps {
+                echo "Deploying Registry service to Kubernetes..."
+                sh "kubectl config use-context minikube || echo 'Using current context'"
+                sh "sed -i 's|registry_microservice:latest|${DOCKERHUB_CREDS_USR}/registry_microservice:latest|g' k8s/registry/registry-deployment.yaml || true"
+                sh "kubectl apply -f k8s/registry/"
+                sh "kubectl rollout status deployment/registry -n metro --timeout=180s || true"
+                echo "Registry service deployed"
+            }
+        }
+
+        stage('Trigger Service Pipelines') {
+            when {
+                expression {
+                    return env.CHANGED_SERVICES?.trim()
+                }
+            }
+            steps {
+                script {
+                    def services = env.CHANGED_SERVICES.split(',')
+                    def parallelBuilds = [:]
+                    
+                    services.each { service ->
+                        def trimmedService = service.trim()
+                        if (trimmedService) {
+                            parallelBuilds[trimmedService] = {
+                                echo "Triggering ${trimmedService}..."
+                                build job: trimmedService,
+                                      parameters: [
+                                          string(name: 'GIT_COMMIT', value: env.GIT_COMMIT),
+                                          string(name: 'TRIGGERED_BY', value: 'master-orchestrator')
+                                      ],
+                                      wait: true,
+                                      propagate: true
+                            }
+                        }
+                    }
+                    
+                    if (parallelBuilds.size() > 0) {
+                        parallel parallelBuilds
+                    } else {
+                        echo "No services to trigger"
+                    }
+                }
+            }
+        }
+
+        stage('No Changes Detected') {
+            when {
+                expression {
+                    return !env.CHANGED_SERVICES?.trim() && env.INFRA_CHANGED == 'false' && 
+                           env.CONTRACTS_CHANGED == 'false' && env.REGISTRY_CHANGED == 'false' &&
+                           !params.FORCE_INFRA_UPDATE && !params.DEPLOY_ALL
+                }
+            }
+            steps {
+                echo "No relevant changes detected. Skipping build."
+            }
+        }
+
+        stage('Summary') {
+            steps {
+                script {
+                    def summary = """
+                    =============================================
+                    BUILD SUMMARY
+                    =============================================
+                    Commit: ${env.GIT_COMMIT ?: 'N/A'}
+                    Contracts Built: ${env.CONTRACTS_CHANGED == 'true' || env.CHANGED_SERVICES?.trim() || params.DEPLOY_ALL}
+                    Registry Built: ${env.REGISTRY_CHANGED == 'true' || params.DEPLOY_ALL}
+                    Infrastructure Updated: ${env.INFRA_CHANGED == 'true' || params.FORCE_INFRA_UPDATE}
+                    Services Deployed: ${env.CHANGED_SERVICES ?: 'None'}
+                    Deploy All: ${params.DEPLOY_ALL}
+                    Force Infra: ${params.FORCE_INFRA_UPDATE}
+                    =============================================
+                    """
+                    echo summary
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Master orchestrator completed successfully"
+            // emailext(
+            //     to: "${EMAIL_IDS_TO_SEND}",
+            //     subject: "SUCCESS: Master Pipeline #${env.BUILD_NUMBER}",
+            //     body: """
+            //     <h2>Build Successful!</h2>
+            //     <p><b>Job:</b> ${env.JOB_NAME}</p>
+            //     <p><b>Build Number:</b> ${env.BUILD_NUMBER}</p>
+            //     <p><b>Services Deployed:</b> ${env.CHANGED_SERVICES ?: 'None'}</p>
+            //     <p><b>Infrastructure Updated:</b> ${env.INFRA_CHANGED == 'true' || params.FORCE_INFRA_UPDATE}</p>
+            //     <p><b>URL:</b> <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
+            //     """,
+            //     mimeType: 'text/html'
+            // )
+        }
+        failure {
+            echo "Master orchestrator failed"
+            // emailext(
+            //     to: "${EMAIL_IDS_TO_SEND}",
+            //     subject: "FAILURE: Master Pipeline #${env.BUILD_NUMBER}",
+            //     body: """
+            //     <h2>Build Failed!</h2>
+            //     <p><b>Job:</b> ${env.JOB_NAME}</p>
+            //     <p><b>Build Number:</b> ${env.BUILD_NUMBER}</p>
+            //     <p><b>Services Attempted:</b> ${env.CHANGED_SERVICES ?: 'None'}</p>
+            //     <p><b>URL:</b> <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
+            //     <p>Please check the console output for details.</p>
+            //     """,
+            //     mimeType: 'text/html'
+            // )
+        }
+        cleanup {
+            cleanWs()
+        }
+    }
+}
