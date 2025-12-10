@@ -139,8 +139,14 @@ pipeline {
                 // Apply namespace first
                 sh "kubectl apply -f k8s/namespace.yaml || true"
                 
+                // ============================================
+                // PHASE 1: Core Infrastructure (deploy & wait)
+                // ============================================
+                
                 // Deploy Redis
+                echo "Deploying Redis..."
                 sh "kubectl apply -f k8s/redis/"
+                sh "kubectl rollout status deployment/redis -n metro --timeout=120s || true"
                 
                 // Install Zalando Postgres Operator CRDs first (cluster-wide)
                 echo "Installing Zalando Postgres Operator CRDs..."
@@ -161,52 +167,51 @@ pipeline {
                 // Wait for Zalando Postgres Operator to be ready
                 echo "Waiting for Zalando Postgres Operator to be ready..."
                 sh "kubectl rollout status deployment/postgres-operator -n default --timeout=180s || echo 'Operator still starting...'"
-                sh "sleep 15"
+                sh "sleep 10"
                 
                 // Deploy Postgres cluster using Zalando Operator (master-slave)
                 echo "Deploying Postgres Master-Slave cluster..."
                 sh "kubectl apply -f k8s/postgres/zalando-postgres.yaml"
+                sh "sleep 20"
                 
-                // Wait for Postgres cluster to be ready
-                echo "Waiting for Postgres cluster to be ready..."
-                sh "sleep 30"
-                sh "kubectl get postgresql -n metro || echo 'Waiting for postgres cluster...'"
+                // Deploy Zookeeper first (required for Kafka)
+                echo "Deploying Zookeeper..."
+                sh "kubectl apply -f k8s/zookeeper/"
+                sh "kubectl rollout status deployment/zookeeper -n metro --timeout=120s || true"
+                
+                // Deploy Kafka (depends on Zookeeper)
+                echo "Deploying Kafka..."
+                sh "kubectl apply -f k8s/kafka/kafka-deployment.yaml"
+                sh "kubectl rollout status deployment/kafka -n metro --timeout=180s || true"
                 
                 // Deploy Elasticsearch
+                echo "Deploying Elasticsearch..."
                 sh "kubectl apply -f k8s/elasticsearch/"
+                sh "kubectl rollout status deployment/elasticsearch -n metro --timeout=120s || true"
                 
-                // Install Strimzi Kafka Operator (for KRaft mode)
-                echo "Installing Strimzi Kafka Operator..."
-                sh """
-                    kubectl create namespace strimzi-system --dry-run=client -o yaml | kubectl apply -f -
-                    kubectl apply -f 'https://strimzi.io/install/latest?namespace=metro' -n metro || true
-                """
-                
-                // Wait for Strimzi Operator to be ready
-                echo "Waiting for Strimzi Operator to be ready..."
-                sh "kubectl rollout status deployment/strimzi-cluster-operator -n metro --timeout=180s || echo 'Strimzi operator still starting...'"
-                sh "sleep 15"
-                
-                // Deploy Strimzi Kafka cluster (KRaft mode - no Zookeeper needed)
-                echo "Deploying Strimzi Kafka cluster..."
-                sh "kubectl apply -f k8s/kafka/"
-                
-                // Wait for Strimzi Kafka to be ready
-                echo "Waiting for Strimzi Kafka cluster to be ready..."
-                sh "sleep 30"
-                sh "kubectl get kafka -n metro || echo 'Kafka still initializing...'"
-                
-                // Deploy registry
+                // Deploy Registry (Eureka) - critical for service discovery
+                echo "Deploying Registry (Eureka)..."
                 sh "kubectl apply -f k8s/registry/"
+                sh "kubectl rollout status deployment/registry -n metro --timeout=120s || true"
                 
                 // Deploy Ingress for routing
                 sh "kubectl apply -f k8s/ingress.yaml"
                 
-                // Wait for critical infrastructure to be ready
-                echo "Waiting for infrastructure to be ready..."
+                // ============================================
+                // PHASE 2: Verify all infrastructure is ready
+                // ============================================
+                echo "Verifying infrastructure is ready..."
                 sh """
-                    kubectl rollout status deployment/redis -n metro --timeout=120s || true
-                    kubectl rollout status deployment/registry -n metro --timeout=120s || true
+                    echo "Checking Redis..."
+                    kubectl get pods -n metro -l app=redis
+                    echo "Checking Zookeeper..."
+                    kubectl get pods -n metro -l app=zookeeper
+                    echo "Checking Kafka..."
+                    kubectl get pods -n metro -l app=kafka
+                    echo "Checking Registry..."
+                    kubectl get pods -n metro -l app=registry
+                    echo "Checking Postgres..."
+                    kubectl get pods -n metro | grep metro-db || true
                 """
                 
                 echo "Infrastructure deployment complete"

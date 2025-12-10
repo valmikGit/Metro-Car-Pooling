@@ -26,13 +26,20 @@ spec:
             - name: SPRING_DATA_REDIS_PORT
               value: "6379"
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
-              value: "metro-kafka-kafka-bootstrap:9092"
+              value: "kafka:9092"
             - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
               value: "http://registry:8761/eureka"
             - name: LOGSTASH_HOST
               value: "logstash"
             - name: LOGSTASH_PORT
               value: "5044"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
 ---
 apiVersion: v1
 kind: Service
