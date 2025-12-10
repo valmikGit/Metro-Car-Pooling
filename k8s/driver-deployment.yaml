@@ -26,7 +26,11 @@ spec:
             - name: SPRING_DATA_REDIS_PORT
               value: "6379"
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
-              value: "kafka:9092"
+              value: "metro-kafka-kafka-bootstrap:9092"
+            - name: SPRING_KAFKA_CONSUMER_BOOTSTRAP_SERVERS
+              value: "metro-kafka-kafka-bootstrap:9092"
+            - name: SPRING_KAFKA_PRODUCER_BOOTSTRAP_SERVERS
+              value: "metro-kafka-kafka-bootstrap:9092"
             - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
               value: "http://registry:8761/eureka"
             - name: LOGSTASH_HOST

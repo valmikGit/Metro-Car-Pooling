@@ -8,21 +8,22 @@ metadata:
 spec:
   replicas: 1
   roles:
-    - broker
     - controller
+    - broker
   storage:
     type: jbod
     volumes:
       - id: 0
-        type: ephemeral
-        kraftMetadata: shared
+        type: persistent-claim
+        size: 10Gi
+        deleteClaim: false
   resources:
     requests:
-      memory: "512Mi"
-      cpu: "200m"
-    limits:
-      memory: "1Gi"
+      memory: 1Gi
       cpu: "500m"
+    limits:
+      memory: 1.5Gi
+      cpu: "1000m"
   jvmOptions:
-    -Xms: "256m"
-    -Xmx: "512m"
+    -Xms: 512m
+    -Xmx: 1024m
