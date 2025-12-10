@@ -227,7 +227,7 @@ pipeline {
             steps {
                 echo "Deploying Registry service to Kubernetes..."
                 sh "kubectl config use-context minikube || echo 'Using current context'"
-                sh "sed -i 's|registry_microservice:latest|${DOCKERHUB_CREDS_USR}/registry_microservice:latest|g' k8s/registry/registry-deployment.yaml || true"
+                sh "sed -i 's|registry_microservice:latest|${DOCKERHUB_CREDS_USR}/registry_microservice:latest|g' k8s/registry/registry-deployment.yml || true"
                 sh "kubectl apply -f k8s/registry/"
                 sh "kubectl rollout status deployment/registry -n metro --timeout=180s || true"
                 echo "Registry service deployed"
