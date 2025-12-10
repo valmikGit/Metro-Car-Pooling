@@ -15,8 +15,8 @@ spec:
     spec:
       containers:
         - name: gateway-service
-          image: gateway_microservice:latest
-          imagePullPolicy: Always
+          image: gateway-gateway:latest
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
           env:

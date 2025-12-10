@@ -15,8 +15,8 @@ spec:
     spec:
       containers:
         - name: frontend-service
-          image: frontend_microservice:latest
-          imagePullPolicy: Always
+          image: frontend-frontend-service:latest
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
           env:

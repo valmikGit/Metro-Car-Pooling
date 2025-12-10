@@ -15,8 +15,8 @@ spec:
     spec:
       containers:
         - name: driver-service
-          image: driver_microservice:latest # This will be replaced by the pipeline or use a specific tag
-          imagePullPolicy: Always
+          image: driver-driver-service:latest # This will be replaced by the pipeline or use a specific tag
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8081
             - containerPort: 9090

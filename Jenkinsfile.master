@@ -9,8 +9,6 @@ pipeline {
     }
 
     environment {
-        // ✅ Add Homebrew path so Jenkins can find 'mvn' and 'java'
-        PATH = "/opt/homebrew/bin:$PATH"
         DOCKERHUB_CREDS = credentials('dockerhub-creds')
         EMAIL_IDS_TO_SEND = ""
         GIT_REPO = 'https://github.com/valmikGit/Metro-Car-Pooling.git'

@@ -15,7 +15,14 @@ spec:
     spec:
       containers:
         - name: registry
-          image: registry:latest
+          image: registry-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8761
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"

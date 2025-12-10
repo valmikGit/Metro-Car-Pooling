@@ -1,19 +1,21 @@
 apiVersion: "acid.zalan.do/v1"
 kind: postgresql
 metadata:
-  name: metro-db
+  name: acid-metro-cluster
   namespace: metro
+  labels:
+    team: metro
 spec:
   teamId: "metro"
   volume:
-    size: 1Gi
+    size: 5Gi
   numberOfInstances: 2
   users:
-    metro_user:  # logical user associated with the DB
+    metrouser:  # username
     - superuser
     - createdb
   databases:
-    metrocarpool: metro_user  # dbname: owner
+    metrocarpool: metrouser  # dbname: owner
   postgresql:
     version: "16"
   resources:
