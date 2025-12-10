@@ -142,18 +142,26 @@ pipeline {
                 // Deploy Redis
                 sh "kubectl apply -f k8s/redis/"
                 
-                // Install Zalando Postgres Operator (for master-slave horizontal scaling)
+                // Install Zalando Postgres Operator CRDs first (cluster-wide)
+                echo "Installing Zalando Postgres Operator CRDs..."
+                sh """
+                    kubectl apply -f https://raw.githubusercontent.com/zalando/postgres-operator/master/manifests/postgresql-operator-default-configuration.yaml || true
+                    kubectl apply -f https://raw.githubusercontent.com/zalando/postgres-operator/master/manifests/operatorconfiguration.crd.yaml || true
+                    kubectl apply -f https://raw.githubusercontent.com/zalando/postgres-operator/master/manifests/postgresql.crd.yaml || true
+                """
+                
+                // Install Zalando Postgres Operator (in default namespace as it's cluster-scoped)
                 echo "Installing Zalando Postgres Operator..."
                 sh """
-                    kubectl apply -f https://raw.githubusercontent.com/zalando/postgres-operator/master/manifests/configmap.yaml -n metro || true
-                    kubectl apply -f https://raw.githubusercontent.com/zalando/postgres-operator/master/manifests/operator-service-account-rbac.yaml -n metro || true
-                    kubectl apply -f https://raw.githubusercontent.com/zalando/postgres-operator/master/manifests/postgres-operator.yaml -n metro || true
+                    kubectl apply -f https://raw.githubusercontent.com/zalando/postgres-operator/master/manifests/configmap.yaml || true
+                    kubectl apply -f https://raw.githubusercontent.com/zalando/postgres-operator/master/manifests/operator-service-account-rbac.yaml || true
+                    kubectl apply -f https://raw.githubusercontent.com/zalando/postgres-operator/master/manifests/postgres-operator.yaml || true
                 """
                 
                 // Wait for Zalando Postgres Operator to be ready
                 echo "Waiting for Zalando Postgres Operator to be ready..."
-                sh "kubectl rollout status deployment/postgres-operator -n metro --timeout=120s || echo 'Operator still starting...'"
-                sh "sleep 10"
+                sh "kubectl rollout status deployment/postgres-operator -n default --timeout=180s || echo 'Operator still starting...'"
+                sh "sleep 15"
                 
                 // Deploy Postgres cluster using Zalando Operator (master-slave)
                 echo "Deploying Postgres Master-Slave cluster..."
@@ -161,7 +169,8 @@ pipeline {
                 
                 // Wait for Postgres cluster to be ready
                 echo "Waiting for Postgres cluster to be ready..."
-                sh "kubectl wait postgresql/metro-db --for=condition=Running --timeout=300s -n metro || echo 'Postgres cluster still initializing...'"
+                sh "sleep 30"
+                sh "kubectl get postgresql -n metro || echo 'Waiting for postgres cluster...'"
                 
                 // Deploy Elasticsearch
                 sh "kubectl apply -f k8s/elasticsearch/"
