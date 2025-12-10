@@ -139,12 +139,32 @@ pipeline {
                 // Apply namespace first
                 sh "kubectl apply -f k8s/namespace.yaml || true"
                 
-                // Deploy core infrastructure components
+                // Deploy Redis
+                sh "kubectl apply -f k8s/redis/"
+                
+                // Install Zalando Postgres Operator (for master-slave horizontal scaling)
+                echo "Installing Zalando Postgres Operator..."
                 sh """
-                    kubectl apply -f k8s/redis/
-                    kubectl apply -f k8s/postgres/
-                    kubectl apply -f k8s/elasticsearch/
+                    kubectl apply -f https://raw.githubusercontent.com/zalando/postgres-operator/master/manifests/configmap.yaml -n metro || true
+                    kubectl apply -f https://raw.githubusercontent.com/zalando/postgres-operator/master/manifests/operator-service-account-rbac.yaml -n metro || true
+                    kubectl apply -f https://raw.githubusercontent.com/zalando/postgres-operator/master/manifests/postgres-operator.yaml -n metro || true
                 """
+                
+                // Wait for Zalando Postgres Operator to be ready
+                echo "Waiting for Zalando Postgres Operator to be ready..."
+                sh "kubectl rollout status deployment/postgres-operator -n metro --timeout=120s || echo 'Operator still starting...'"
+                sh "sleep 10"
+                
+                // Deploy Postgres cluster using Zalando Operator (master-slave)
+                echo "Deploying Postgres Master-Slave cluster..."
+                sh "kubectl apply -f k8s/postgres/zalando-postgres.yaml"
+                
+                // Wait for Postgres cluster to be ready
+                echo "Waiting for Postgres cluster to be ready..."
+                sh "kubectl wait postgresql/metro-db --for=condition=Running --timeout=300s -n metro || echo 'Postgres cluster still initializing...'"
+                
+                // Deploy Elasticsearch
+                sh "kubectl apply -f k8s/elasticsearch/"
                 
                 // Deploy Strimzi Kafka (KRaft mode - no Zookeeper needed)
                 echo "Deploying Strimzi Kafka..."
@@ -164,7 +184,6 @@ pipeline {
                 echo "Waiting for infrastructure to be ready..."
                 sh """
                     kubectl rollout status deployment/redis -n metro --timeout=120s || true
-                    kubectl rollout status deployment/postgres -n metro --timeout=120s || true
                     kubectl rollout status deployment/registry -n metro --timeout=120s || true
                 """
                 
