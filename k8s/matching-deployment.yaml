@@ -15,8 +15,8 @@ spec:
     spec:
       containers:
         - name: matching-service
-          image: matching_microservice:latest
-          imagePullPolicy: Always
+          image: matching-matching-service:latest
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8082
           env:

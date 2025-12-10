@@ -5,7 +5,7 @@ WORKDIR /app
 # Dependencies
 FROM base AS deps
 # Copy from frontend/ since build context is project root
-COPY frontend/package.json frontend/package-lock.json ./
+COPY package.json package-lock.json ./
 RUN npm install
 
 # Builder
@@ -15,7 +15,7 @@ ENV npm_config_user_agent=npm
 
 COPY --from=deps /app/node_modules ./node_modules
 # Copy frontend folder contents
-COPY frontend/ .
+COPY . .
 RUN npm run build
 
 # Runtime

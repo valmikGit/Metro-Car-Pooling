@@ -27,7 +27,6 @@
         <!-- ✔ Your explicit versions -->
         <grpc.version>1.76.0</grpc.version>
         <protobuf-java.version>4.32.1</protobuf-java.version>
-        <lombok.version>1.18.36</lombok.version>
     </properties>
 
     <modules>

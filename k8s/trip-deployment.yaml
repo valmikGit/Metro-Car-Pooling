@@ -15,8 +15,8 @@ spec:
     spec:
       containers:
         - name: trip-service
-          image: trip_microservice:latest
-          imagePullPolicy: Always
+          image: trip-trip-service:latest
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8086
           env:

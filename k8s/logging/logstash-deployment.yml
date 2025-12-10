@@ -24,6 +24,15 @@ spec:
             # we don't use monitoring here; keeps it light
             - name: xpack.monitoring.enabled
               value: "false"
+            - name: LS_JAVA_OPTS
+              value: "-Xmx512m -Xms256m"
+          resources:
+            limits:
+              memory: 1Gi
+              cpu: 500m
+            requests:
+              memory: 512Mi
+              cpu: 250m
           volumeMounts:
             - name: pipeline
               mountPath: /usr/share/logstash/pipeline

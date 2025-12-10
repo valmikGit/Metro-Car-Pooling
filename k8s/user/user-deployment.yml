@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: user
-          image: user-service:latest
+          image: user-user-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8081
@@ -28,16 +28,16 @@ spec:
             # Postgres connection
             # Postgres connection
             - name: SPRING_DATASOURCE_URL
-              value: jdbc:postgresql://metro-db.metro.svc:5432/metrocarpool
+              value: jdbc:postgresql://acid-metro-cluster:5432/metrocarpool
             - name: SPRING_DATASOURCE_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: metro-user.metro-db.credentials.postgresql.acid.zalan.do
+                  name: metrouser.acid-metro-cluster.credentials.postgresql.acid.zalan.do
                   key: username
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: metro-user.metro-db.credentials.postgresql.acid.zalan.do
+                  name: metrouser.acid-metro-cluster.credentials.postgresql.acid.zalan.do
                   key: password
 
             # Eureka
