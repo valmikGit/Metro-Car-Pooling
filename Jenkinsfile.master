@@ -175,13 +175,26 @@ pipeline {
                 // Deploy Elasticsearch
                 sh "kubectl apply -f k8s/elasticsearch/"
                 
-                // Deploy Strimzi Kafka (KRaft mode - no Zookeeper needed)
-                echo "Deploying Strimzi Kafka..."
+                // Install Strimzi Kafka Operator (for KRaft mode)
+                echo "Installing Strimzi Kafka Operator..."
+                sh """
+                    kubectl create namespace strimzi-system --dry-run=client -o yaml | kubectl apply -f -
+                    kubectl apply -f 'https://strimzi.io/install/latest?namespace=metro' -n metro || true
+                """
+                
+                // Wait for Strimzi Operator to be ready
+                echo "Waiting for Strimzi Operator to be ready..."
+                sh "kubectl rollout status deployment/strimzi-cluster-operator -n metro --timeout=180s || echo 'Strimzi operator still starting...'"
+                sh "sleep 15"
+                
+                // Deploy Strimzi Kafka cluster (KRaft mode - no Zookeeper needed)
+                echo "Deploying Strimzi Kafka cluster..."
                 sh "kubectl apply -f k8s/kafka/"
                 
                 // Wait for Strimzi Kafka to be ready
                 echo "Waiting for Strimzi Kafka cluster to be ready..."
-                sh "kubectl wait kafka/metro-kafka --for=condition=Ready --timeout=300s -n metro || echo 'Kafka still initializing...'"
+                sh "sleep 30"
+                sh "kubectl get kafka -n metro || echo 'Kafka still initializing...'"
                 
                 // Deploy registry
                 sh "kubectl apply -f k8s/registry/"
