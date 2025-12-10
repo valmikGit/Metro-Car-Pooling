@@ -40,13 +40,13 @@ spec:
             - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
               value: "true"
             - name: KAFKA_HEAP_OPTS
-              value: "-Xmx256M -Xms256M"
+              value: "-Xmx384M -Xms384M"
           resources:
             requests:
-              memory: "256Mi"
+              memory: "384Mi"
               cpu: "200m"
             limits:
-              memory: "512Mi"
+              memory: "768Mi"
               cpu: "500m"
           readinessProbe:
             tcpSocket:
