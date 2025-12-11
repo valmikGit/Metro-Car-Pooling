@@ -237,6 +237,15 @@ pipeline {
             }
         }
 
+        stage('Debug Matching Build') {
+            steps {
+                echo "DEBUGGING MATCHING MODULE DEPENDENCIES..."
+                sh "mvn -f matching/pom.xml dependency:tree -Dverbose -Dincludes=org.projectlombok:lombok"
+                sh "mvn -f matching/pom.xml help:effective-pom -Dverbose >> effective-pom-matching.xml"
+                sh "cat effective-pom-matching.xml | grep -A 20 maven-compiler-plugin"
+            }
+        }
+
         stage('Trigger Service Pipelines') {
             when {
                 expression {
