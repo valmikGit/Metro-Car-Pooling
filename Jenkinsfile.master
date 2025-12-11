@@ -174,7 +174,7 @@ pipeline {
                 
                 // Deploy Postgres cluster using Zalando Operator (master-slave)
                 echo "Deploying Postgres Master-Slave cluster..."
-                sh "kubectl apply -f k8s/postgres/zalando-postgres.yaml"
+                sh "kubectl apply -f k8s/postgres/postgresql-zalando.yaml"
                 sh "sleep 20"
                 
                 // Deploy Zookeeper first (required for Kafka)
