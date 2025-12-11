@@ -74,7 +74,7 @@ export default function RiderPage() {
 
     console.log('Attempting to connect to SSE matches endpoint...')
 
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8088'
     const eventSource = new EventSource(
       `${API_BASE_URL}/api/notification/matches?status=true`,
       { withCredentials: true }
@@ -83,7 +83,7 @@ export default function RiderPage() {
     eventSource.onopen = () => {
       console.log('SSE connection opened for rider matches')
       setSseConnected(true)
-    }
+    } 
 
     eventSource.onmessage = (event) => {
       try {
@@ -124,7 +124,7 @@ export default function RiderPage() {
   useEffect(() => {
     if (!authenticated || !riderId || rideState !== 'active') return
 
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8088'
     const eventSource = new EventSource(
       `${API_BASE_URL}/api/notification/driver-location-for-rider?status=true`,
       { withCredentials: true }
@@ -173,7 +173,7 @@ export default function RiderPage() {
 
     console.log('Attempting to connect to rider ride completion SSE endpoint...')
 
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8088'
     const eventSource = new EventSource(
       `${API_BASE_URL}/api/notification/rider-ride-completion?status=true`,
       { withCredentials: true }

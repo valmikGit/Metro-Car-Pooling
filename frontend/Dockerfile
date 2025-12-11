@@ -12,6 +12,8 @@ RUN npm install
 FROM base AS builder
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV npm_config_user_agent=npm
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 COPY --from=deps /app/node_modules ./node_modules
 # Copy frontend folder contents

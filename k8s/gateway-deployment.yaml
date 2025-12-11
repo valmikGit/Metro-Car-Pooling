@@ -15,10 +15,10 @@ spec:
     spec:
       containers:
         - name: gateway-service
-          image: gateway-gateway:latest
+          image: gateway-gateway:v2
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 8080
+            - containerPort: 8081
           env:
             - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
               value: "http://registry:8761/eureka"
@@ -44,7 +44,7 @@ spec:
     app: gateway-service
   ports:
     - protocol: TCP
-      port: 8080
-      targetPort: 8080
+      port: 8088
+      targetPort: 8081
       name: http
   type: LoadBalancer  # Exposes gateway externally as API entry point

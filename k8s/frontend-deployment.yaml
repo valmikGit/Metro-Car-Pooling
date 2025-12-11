@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: frontend-service
-          image: frontend-frontend-service:latest
+          image: frontend-frontend-service:v2
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
@@ -23,7 +23,7 @@ spec:
             - name: NODE_ENV
               value: "production"
             - name: NEXT_PUBLIC_API_URL
-              value: "http://gateway-service:8080"
+              value: "http://127.0.0.1:8088"
           resources:
             requests:
               memory: "256Mi"

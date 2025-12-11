@@ -6,7 +6,7 @@ FROM maven:3.9.9-eclipse-temurin-21 AS builder
 WORKDIR /app
 
 # Copy full multi-module project INTO builder
-COPY .. /app
+COPY . .
 
 # Build ONLY the gateway module
 RUN mvn -pl gateway -am clean package -DskipTests

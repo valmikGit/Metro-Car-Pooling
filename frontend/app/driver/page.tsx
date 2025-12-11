@@ -58,7 +58,7 @@ export default function DriverPage() {
     // Only connect when waiting for or already matched with a driver
     if (!authenticated || !driverId || (rideState !== 'waiting' && rideState !== 'matched')) return
 
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8088'
     const eventSource = new EventSource(
       `${API_BASE_URL}/api/notification/matches?status=true`,
       { withCredentials: true }
@@ -108,7 +108,7 @@ export default function DriverPage() {
 
     console.log('Attempting to connect to driver ride completion SSE endpoint...')
 
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081'
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8088'
     const eventSource = new EventSource(
       `${API_BASE_URL}/api/notification/driver-ride-completion?status=true`,
       { withCredentials: true }
