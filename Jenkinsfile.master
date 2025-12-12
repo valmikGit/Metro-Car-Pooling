@@ -180,6 +180,8 @@ pipeline {
                 
                 // Deploy Strimzi Kafka Cluster (KRaft mode - no Zookeeper)
                 echo "Deploying Strimzi Kafka Cluster..."
+                // NodePool must be applied first for KRaft mode
+                sh "kubectl apply -f k8s/kafka/metro-kafka-nodepool.yml"
                 sh "kubectl apply -f k8s/kafka/metro-kafka.yml"
                 
                 // Deploy Postgres cluster using Zalando Operator
@@ -209,20 +211,21 @@ pipeline {
                 echo "Deploying Ingress..."
                 sh "kubectl apply -f k8s/ingress.yaml"
                 
-                // ============================================
-                // PHASE 3: Verify Infrastructure
-                // ============================================
-                echo "Verifying infrastructure is ready..."
+                // Build and deploy Redis cache loader for map data
+                echo "Building Redis cache loader..."
                 sh """
-                    echo "Checking Redis..."
-                    kubectl get pods -n metro -l app=redis
-                    echo "Checking Kafka..."
-                    kubectl get pods -n metro -l strimzi.io/cluster=metro-kafka || true
-                    echo "Checking Registry..."
-                    kubectl get pods -n metro -l app=registry
-                    echo "Checking Postgres..."
-                    kubectl get pods -n metro -l app.kubernetes.io/name=postgres || kubectl get pods -n metro | grep acid || true
+                    cd infra
+                    docker build -f redis_loader/Dockerfile -t infra-cache-loader:latest .
+                    cd ..
                 """
+                echo "Loading cache loader image into Minikube..."
+                sh "minikube image load infra-cache-loader:latest"
+                
+                echo "Running Redis cache loader job..."
+                sh "kubectl -n metro delete job redis-loader --ignore-not-found"
+                sh "kubectl apply -f k8s/redis-loader-job.yaml"
+                sh "kubectl -n metro wait --for=condition=complete job/redis-loader --timeout=60s || echo 'Redis loader job timeout'"
+                sh "kubectl -n metro logs job/redis-loader || true"
                 
                 echo "Infrastructure deployment complete"
             }
