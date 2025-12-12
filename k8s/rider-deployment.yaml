@@ -15,8 +15,10 @@ spec:
     spec:
       containers:
         - name: rider-service
-          image: rider-rider-service:latest
-          imagePullPolicy: IfNotPresent
+          # image: rider-rider-service:latest
+          # imagePullPolicy: IfNotPresent
+          image: inevertheless/rider_microservice:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8083
           env:

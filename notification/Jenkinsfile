@@ -8,8 +8,7 @@ pipeline {
 
     environment {
         DOCKERHUB_CREDS = credentials('dockerhub-creds')
-        LOCAL_IMAGE = "notification-notification-service:latest"
-        DOCKERHUB_IMAGE = "${DOCKERHUB_CREDS_USR}/notification_microservice:latest"
+        DOCKER_IMAGE = "${DOCKERHUB_CREDS_USR}/notification_microservice:latest"
         EMAIL_IDS_TO_SEND = ""
     }
 
@@ -38,9 +37,8 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                echo "Building Docker image with local name..."
-                sh "docker build -f notification/Dockerfile -t ${LOCAL_IMAGE} ."
-                sh "docker tag ${LOCAL_IMAGE} ${DOCKERHUB_IMAGE}"
+                echo "Building Docker image..."
+                sh "docker build -f notification/Dockerfile -t ${DOCKER_IMAGE} ."
             }
         }
 
@@ -48,7 +46,7 @@ pipeline {
             steps {
                 echo "Pushing to DockerHub..."
                 sh "echo ${DOCKERHUB_CREDS_PSW} | docker login -u ${DOCKERHUB_CREDS_USR} --password-stdin"
-                sh "docker push ${DOCKERHUB_IMAGE}"
+                sh "docker push ${DOCKER_IMAGE}"
             }
         }
 

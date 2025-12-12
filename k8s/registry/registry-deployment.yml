@@ -15,8 +15,10 @@ spec:
     spec:
       containers:
         - name: registry
-          image: registry-service:latest
-          imagePullPolicy: IfNotPresent
+          # image: registry-service:latest
+          # imagePullPolicy: IfNotPresent
+          image: inevertheless/registry_microservice:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8761
           resources:

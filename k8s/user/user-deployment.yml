@@ -15,8 +15,10 @@ spec:
     spec:
       containers:
         - name: user
-          image: user-user-service:latest
-          imagePullPolicy: IfNotPresent
+          # image: user-user-service:latest
+          # imagePullPolicy: IfNotPresent
+          image: inevertheless/user_microservice:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8081
             - containerPort: 9095

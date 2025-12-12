@@ -124,10 +124,7 @@ pipeline {
             }
             steps {
                 echo "Building and pushing Registry Docker image..."
-                // Build with local name matching k8s deployment
-                sh "docker build -f registry/Dockerfile -t registry-service:latest ."
-                // Tag for DockerHub backup
-                sh "docker tag registry-service:latest ${DOCKERHUB_CREDS_USR}/registry_microservice:latest"
+                sh "docker build -f registry/Dockerfile -t ${DOCKERHUB_CREDS_USR}/registry_microservice:latest ."
                 sh "echo ${DOCKERHUB_CREDS_PSW} | docker login -u ${DOCKERHUB_CREDS_USR} --password-stdin"
                 sh "docker push ${DOCKERHUB_CREDS_USR}/registry_microservice:latest"
             }

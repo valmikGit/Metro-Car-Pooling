@@ -15,8 +15,10 @@ spec:
     spec:
       containers:
         - name: driver-service
-          image: driver-driver-service:latest
-          imagePullPolicy: IfNotPresent
+          # image: driver-driver-service:latest
+          # imagePullPolicy: IfNotPresent
+          image: inevertheless/driver_microservice:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8081
             - containerPort: 9090
