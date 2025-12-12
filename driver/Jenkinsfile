@@ -70,33 +70,33 @@ pipeline {
     post {
         success {
             echo "Successfully executed the driver pipeline"
-            // emailext(
-            //     to: "${EMAIL_IDS_TO_SEND}",
-            //     subject: "SUCCESS: Driver Pipeline #${env.BUILD_NUMBER}",
-            //     body: """
-            //     <b>Build successful!</b><br>
-            //     Job: ${env.JOB_NAME}<br>
-            //     Build Number: ${env.BUILD_NUMBER}<br>
-            //     Triggered By: ${params.TRIGGERED_BY}<br>
-            //     URL: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a>
-            //     """,
-            //     mimeType: 'text/html'
-            // )
+            emailext(
+                to: "${EMAIL_IDS_TO_SEND}",
+                subject: "SUCCESS: Driver Pipeline #${env.BUILD_NUMBER}",
+                body: """
+                <b>Build successful!</b><br>
+                Job: ${env.JOB_NAME}<br>
+                Build Number: ${env.BUILD_NUMBER}<br>
+                Triggered By: ${params.TRIGGERED_BY}<br>
+                URL: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a>
+                """,
+                mimeType: 'text/html'
+            )
         }
         failure {
             echo "Failed to execute the driver pipeline"
-            // emailext(
-            //     to: "${EMAIL_IDS_TO_SEND}",
-            //     subject: "FAILURE: Driver Pipeline #${env.BUILD_NUMBER}",
-            //     body: """
-            //     <b>Build failed!</b><br>
-            //     Job: ${env.JOB_NAME}<br>
-            //     Build Number: ${env.BUILD_NUMBER}<br>
-            //     Triggered By: ${params.TRIGGERED_BY}<br>
-            //     URL: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a>
-            //     """,
-            //     mimeType: 'text/html'
-            // )
+            emailext(
+                to: "${EMAIL_IDS_TO_SEND}",
+                subject: "FAILURE: Driver Pipeline #${env.BUILD_NUMBER}",
+                body: """
+                <b>Build failed!</b><br>
+                Job: ${env.JOB_NAME}<br>
+                Build Number: ${env.BUILD_NUMBER}<br>
+                Triggered By: ${params.TRIGGERED_BY}<br>
+                URL: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a>
+                """,
+                mimeType: 'text/html'
+            )
         }
         cleanup {
             cleanWs()
