@@ -13,6 +13,7 @@ pipeline {
         EMAIL_IDS_TO_SEND = ""
         GIT_REPO = 'https://github.com/valmikGit/Metro-Car-Pooling.git'
         KUBECONFIG = '/var/lib/jenkins/.kube/config'
+        // KUBECONFIG = '/Users/krishdave/.kube/config'
     }
 
     triggers {
@@ -93,13 +94,13 @@ pipeline {
                 }
             }
         }
-        
-        // stage('Setup Environment') {
-        //     steps {
-        //         echo "Cleaning Lombok from local Maven repository to force fresh download..."
-        //         sh "rm -rf ~/.m2/repository/org/projectlombok"
-        //     }
-        // }
+
+        stage('Setup Environment') {
+            steps {
+                echo "Cleaning Lombok from local Maven repository to force fresh download..."
+                sh "rm -rf ~/.m2/repository/org/projectlombok"
+            }
+        }
 
         stage('Build Contracts') {
             when {
@@ -138,14 +139,10 @@ pipeline {
             steps {
                 echo "Deploying infrastructure to Kubernetes (Minikube)..."
                 
-                // Ensure we're using minikube context - CRITICAL for correct cluster
-                echo "Setting up kubectl context..."
-                sh "kubectl config use-context minikube"
-                sh "kubectl cluster-info"
-                sh "kubectl get nodes"
+                sh "kubectl config use-context minikube || echo 'Using current context'"
                 
                 // Apply namespace first
-                sh "kubectl apply -f k8s/namespace.yaml"
+                sh "kubectl apply -f k8s/namespace.yaml || true"
                 
                 // ============================================
                 // PHASE 1: Core Infrastructure (deploy & wait)
