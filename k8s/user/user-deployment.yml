@@ -28,7 +28,6 @@ spec:
               value: user
 
             # Postgres connection
-            # Postgres connection
             - name: SPRING_DATASOURCE_URL
               value: jdbc:postgresql://acid-metro-cluster:5432/metrocarpool
             - name: SPRING_DATASOURCE_USERNAME

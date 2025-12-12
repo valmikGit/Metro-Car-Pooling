@@ -53,11 +53,7 @@ pipeline {
         stage('Deploy to K8s') {
             steps {
                 echo "Deploying to Kubernetes (Minikube)..."
-                // Ensure we're using minikube context
                 sh "kubectl config use-context minikube || echo 'Using current context'"
-                // Update image in deployment yaml
-                sh "sed -i '' 's|driver_microservice:latest|${DOCKER_IMAGE}|g' k8s/driver-deployment.yaml"
-                // Apply K8s manifests
                 sh "kubectl apply -f k8s/driver-deployment.yaml"
             }
         }
