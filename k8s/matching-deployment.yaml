@@ -21,19 +21,19 @@ spec:
             - containerPort: 8082
           env:
             - name: SPRING_DATA_REDIS_HOST
-              value: "redis"
+              value: "redis.metro.svc.cluster.local"
             - name: SPRING_DATA_REDIS_PORT
               value: "6379"
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
-              value: "metro-kafka-kafka-bootstrap:9092"
+              value: "metro-kafka-kafka-bootstrap.metro.svc.cluster.local:9092"
             - name: SPRING_KAFKA_CONSUMER_BOOTSTRAP_SERVERS
-              value: "metro-kafka-kafka-bootstrap:9092"
+              value: "metro-kafka-kafka-bootstrap.metro.svc.cluster.local:9092"
             - name: SPRING_KAFKA_PRODUCER_BOOTSTRAP_SERVERS
-              value: "metro-kafka-kafka-bootstrap:9092"
+              value: "metro-kafka-kafka-bootstrap.metro.svc.cluster.local:9092"
             - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
-              value: "http://registry:8761/eureka"
+              value: "http://registry.metro.svc.cluster.local:8761/eureka"
             - name: LOGSTASH_HOST
-              value: "logstash"
+              value: "logstash.metro.svc.cluster.local"
             - name: LOGSTASH_PORT
               value: "5044"
           resources:
