@@ -60,8 +60,6 @@ pipeline {
                 echo "Deploying to Kubernetes (Minikube)..."
                 // Ensure we're using minikube context
                 sh "kubectl config use-context minikube || echo 'Using current context'"
-                // Update image in deployment yaml
-                sh "sed -i '' 's|frontend_microservice:latest|${DOCKER_IMAGE}|g' k8s/frontend-deployment.yaml"
                 // Apply K8s manifests
                 sh "kubectl apply -f k8s/frontend-deployment.yaml"
             }

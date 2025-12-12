@@ -56,7 +56,6 @@ pipeline {
             steps {
                 echo "Deploying to Kubernetes (Minikube)..."
                 sh "kubectl config use-context minikube || echo 'Using current context'"
-                sh "sed -i '' 's|rider_microservice:latest|${DOCKER_IMAGE}|g' k8s/rider-deployment.yaml"
                 sh "kubectl apply -f k8s/rider-deployment.yaml"
             }
         }
