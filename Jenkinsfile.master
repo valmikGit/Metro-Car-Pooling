@@ -139,8 +139,14 @@ pipeline {
             steps {
                 echo "Deploying infrastructure to Kubernetes (Minikube)..."
                 
+                // Ensure we're using minikube context - CRITICAL for correct cluster
+                echo "Setting up kubectl context..."
+                sh "kubectl config use-context minikube"
+                sh "kubectl cluster-info"
+                sh "kubectl get nodes"
+                
                 // Apply namespace first
-                sh "kubectl apply -f k8s/namespace.yaml || true"
+                sh "kubectl apply -f k8s/namespace.yaml"
                 
                 // ============================================
                 // PHASE 1: Core Infrastructure (deploy & wait)
