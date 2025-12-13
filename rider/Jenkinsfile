@@ -9,7 +9,7 @@ pipeline {
     environment {
         DOCKERHUB_CREDS = credentials('dockerhub-creds')
         DOCKER_IMAGE = "${DOCKERHUB_CREDS_USR}/rider_microservice:latest"
-        EMAIL_IDS_TO_SEND = ""
+        EMAIL_IDS_TO_SEND = "valmik.belgaonkar@iiitb.ac.in"
     }
 
     stages {
@@ -58,45 +58,45 @@ pipeline {
             }
         }
 
-        stage('Verify Deployment') {
-            steps {
-                echo "Verifying deployment..."
-                sh "kubectl rollout status deployment/rider-service -n metro --timeout=180s"
-                echo "Rider service deployment successful!"
-            }
-        }
+        // stage('Verify Deployment') {
+        //     steps {
+        //         echo "Verifying deployment..."
+        //         sh "kubectl rollout status deployment/rider-service -n metro --timeout=180s"
+        //         echo "Rider service deployment successful!"
+        //     }
+        // }
     }
 
     post {
         success {
             echo "Successfully executed the rider pipeline"
-            // emailext(
-            //     to: "${EMAIL_IDS_TO_SEND}",
-            //     subject: "SUCCESS: Rider Pipeline #${env.BUILD_NUMBER}",
-            //     body: """
-            //     <b>Build successful!</b><br>
-            //     Job: ${env.JOB_NAME}<br>
-            //     Build Number: ${env.BUILD_NUMBER}<br>
-            //     Triggered By: ${params.TRIGGERED_BY}<br>
-            //     URL: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a>
-            //     """,
-            //     mimeType: 'text/html'
-            // )
+            emailext(
+                to: "${EMAIL_IDS_TO_SEND}",
+                subject: "SUCCESS: Rider Pipeline #${env.BUILD_NUMBER}",
+                body: """
+                <b>Build successful!</b><br>
+                Job: ${env.JOB_NAME}<br>
+                Build Number: ${env.BUILD_NUMBER}<br>
+                Triggered By: ${params.TRIGGERED_BY}<br>
+                URL: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a>
+                """,
+                mimeType: 'text/html'
+            )
         }
         failure {
             echo "Failed to execute the rider pipeline"
-            // emailext(
-            //     to: "${EMAIL_IDS_TO_SEND}",
-            //     subject: "FAILURE: Rider Pipeline #${env.BUILD_NUMBER}",
-            //     body: """
-            //     <b>Build failed!</b><br>
-            //     Job: ${env.JOB_NAME}<br>
-            //     Build Number: ${env.BUILD_NUMBER}<br>
-            //     Triggered By: ${params.TRIGGERED_BY}<br>
-            //     URL: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a>
-            //     """,
-            //     mimeType: 'text/html'
-            // )
+            emailext(
+                to: "${EMAIL_IDS_TO_SEND}",
+                subject: "FAILURE: Rider Pipeline #${env.BUILD_NUMBER}",
+                body: """
+                <b>Build failed!</b><br>
+                Job: ${env.JOB_NAME}<br>
+                Build Number: ${env.BUILD_NUMBER}<br>
+                Triggered By: ${params.TRIGGERED_BY}<br>
+                URL: <a href="${env.BUILD_URL}">${env.BUILD_URL}</a>
+                """,
+                mimeType: 'text/html'
+            )
         }
         cleanup {
             cleanWs()

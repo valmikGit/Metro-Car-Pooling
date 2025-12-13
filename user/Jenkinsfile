@@ -57,14 +57,6 @@ pipeline {
                 sh "kubectl apply -f k8s/user/"
             }
         }
-
-        stage('Verify Deployment') {
-            steps {
-                echo "Verifying deployment..."
-                sh "kubectl rollout status deployment/user -n metro --timeout=300s"
-                echo "User service deployment successful!"
-            }
-        }
     }
 
     post {
