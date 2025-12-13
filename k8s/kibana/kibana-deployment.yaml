@@ -22,7 +22,7 @@ spec:
             - containerPort: 5601
           env:
             - name: ELASTICSEARCH_HOSTS
-              value: "http://elasticsearch:9200"
+              value: "http://elasticsearch.metro.svc.cluster.local:9200"
             - name: XPACK_SECURITY_ENABLED
               value: "false"
           resources:
