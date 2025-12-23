@@ -8,8 +8,7 @@ import org.springframework.kafka.annotation.EnableKafka;
 @EnableKafka
 public class NotificationApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(NotificationApplication.class, args);
-	}
-
+  public static void main(String[] args) {
+    SpringApplication.run(NotificationApplication.class, args);
+  }
 }

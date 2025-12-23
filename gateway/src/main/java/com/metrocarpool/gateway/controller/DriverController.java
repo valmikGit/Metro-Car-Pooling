@@ -14,14 +14,13 @@ import org.springframework.web.bind.annotation.*;
 @CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
 @Slf4j
 public class DriverController {
-    @Autowired
-    private DriverGrpcClient driverGrpcClient;
+  @Autowired private DriverGrpcClient driverGrpcClient;
 
-    @PostMapping(value = "/driver-info")
-    public DriverStatusResponseDTO postDriverInformation(@RequestBody PostDriverDTO postDriverDTO) {
-        log.info("Reached DriverController.postDriverInformation.");
-        return DriverStatusResponseDTO.builder()
-                .STATUSSSSS(driverGrpcClient.postDriverInfo(postDriverDTO).getStatus())
-                .build();
-    }
+  @PostMapping(value = "/driver-info")
+  public DriverStatusResponseDTO postDriverInformation(@RequestBody PostDriverDTO postDriverDTO) {
+    log.info("Reached DriverController.postDriverInformation.");
+    return DriverStatusResponseDTO.builder()
+        .STATUSSSSS(driverGrpcClient.postDriverInfo(postDriverDTO).getStatus())
+        .build();
+  }
 }

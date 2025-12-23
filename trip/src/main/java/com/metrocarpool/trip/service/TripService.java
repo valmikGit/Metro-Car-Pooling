@@ -1,352 +1,431 @@
 package com.metrocarpool.trip.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.metrocarpool.contracts.proto.*;
-import com.metrocarpool.trip.redislock.RedisDistributedLock;
-import lombok.extern.slf4j.Slf4j;
-import com.metrocarpool.trip.cache.TripCache;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.metrocarpool.contracts.proto.*;
+import com.metrocarpool.trip.cache.TripCache;
+import com.metrocarpool.trip.redislock.RedisDistributedLock;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Service;
-import org.springframework.kafka.support.Acknowledgment;
-
-import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 
 /**
- * TripService with safe initialization of caches read from Redis.
- * Only null-checks and initializations were added. Logic unchanged.
+ * TripService with safe initialization of caches read from Redis. Only null-checks and
+ * initializations were added. Logic unchanged.
  */
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class TripService {
 
-    private final KafkaTemplate<String, byte[]> kafkaTemplate;
-    @Value("${kafka.topics.driver-ride-completion}")
-    private String DRIVER_RIDE_COMPLETION_TOPIC;
-    @Value("${kafka.topics.rider-ride-completion}")
-    private String RIDER_RIDE_COMPLETION_TOPIC;
-    @Value("${kafka.topics.driver-location-rider}")
-    private String DRIVER_LOCATION_RIDER;
+  private final KafkaTemplate<String, byte[]> kafkaTemplate;
 
-    private final RedisTemplate<String, Object> redisTemplate;
-    private static final String TRIP_CACHE_KEY = "trip-cache";
+  @Value("${kafka.topics.driver-ride-completion}")
+  private String DRIVER_RIDE_COMPLETION_TOPIC;
 
-    // Redis Distributed Lock
-    private final RedisDistributedLock redisDistributedLock;
-    private static final String redisTripLockKey = "lock:trip";
+  @Value("${kafka.topics.rider-ride-completion}")
+  private String RIDER_RIDE_COMPLETION_TOPIC;
 
-    // String template + mapper for tolerant reads of plain JSON (no @class)
-    private final RedisTemplate<String, String> redisStringTemplate;
-    private final ObjectMapper objectMapper;
+  @Value("${kafka.topics.driver-location-rider}")
+  private String DRIVER_LOCATION_RIDER;
 
-    // Redis usage to ensure Kafka consumer idempotency
-    private static final String RIDER_DRIVER_MATCH_KAFKA_DEDUP_KEY_PREFIX = "rider_driver_match_processed_kafka_msg:";
-    private static final String TRIP_COMPLETED_KAFKA_DEDUP_KEY_PREFIX = "trip_completed_processed_kafka_msg:";
-    private static final String DRIVER_UPDATES_KAFKA_DEDUP_KEY_PREFIX = "driver_updates_processed_kafka_msg:";
-//    private static final String DRIVER_LOCATION_RIDER_KAFKA_DEDUP_KEY_PREFIX = "driver_location_rider_processed_kafka_msg:";
+  private final RedisTemplate<String, Object> redisTemplate;
+  private static final String TRIP_CACHE_KEY = "trip-cache";
 
-    private boolean alreadyProcessed(String topicDedupKey, String messageId) {
-        if (messageId == null) return false;
+  // Redis Distributed Lock
+  private final RedisDistributedLock redisDistributedLock;
+  private static final String redisTripLockKey = "lock:trip";
 
-        String redisKey = topicDedupKey + messageId;
+  // String template + mapper for tolerant reads of plain JSON (no @class)
+  private final RedisTemplate<String, String> redisStringTemplate;
+  private final ObjectMapper objectMapper;
 
-        return redisStringTemplate.hasKey(redisKey);
+  // Redis usage to ensure Kafka consumer idempotency
+  private static final String RIDER_DRIVER_MATCH_KAFKA_DEDUP_KEY_PREFIX =
+      "rider_driver_match_processed_kafka_msg:";
+  private static final String TRIP_COMPLETED_KAFKA_DEDUP_KEY_PREFIX =
+      "trip_completed_processed_kafka_msg:";
+  private static final String DRIVER_UPDATES_KAFKA_DEDUP_KEY_PREFIX =
+      "driver_updates_processed_kafka_msg:";
+
+  //    private static final String DRIVER_LOCATION_RIDER_KAFKA_DEDUP_KEY_PREFIX =
+  // "driver_location_rider_processed_kafka_msg:";
+
+  private boolean alreadyProcessed(String topicDedupKey, String messageId) {
+    if (messageId == null) return false;
+
+    String redisKey = topicDedupKey + messageId;
+
+    return redisStringTemplate.hasKey(redisKey);
+  }
+
+  private void markProcessed(String topicDedupKey, String messageId) {
+    if (messageId == null) return;
+
+    String redisKey = topicDedupKey + messageId;
+
+    // store marker with 24-hour TTL
+    redisStringTemplate.opsForValue().set(redisKey, "1", 24, TimeUnit.HOURS);
+  }
+
+  private String tryAcquireLockWithRetry(String lockKey) {
+    for (int attempt = 1; attempt <= 10; attempt++) {
+      String lockValue = redisDistributedLock.acquireLock(lockKey, 5000);
+      if (lockValue != null) {
+        return lockValue; // success
+      }
+
+      log.warn(
+          "Lock not acquired for key {}. Attempt {}/{}. Retrying in {} ms...",
+          lockKey,
+          attempt,
+          10,
+          (long) 200);
+
+      try {
+        Thread.sleep((long) 200);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        return null;
+      }
+    }
+    return null; // all retries failed
+  }
+
+  /**
+   * Helper: load trip-cache from Redis, initialize if missing, and persist back. Ensures top-level
+   * map exists.
+   */
+  @SuppressWarnings("unchecked")
+  private Map<String, List<TripCache>> loadOrInitTripCache() {
+    Map<String, List<TripCache>> allTripCacheData =
+        (Map<String, List<TripCache>>) redisTemplate.opsForValue().get(TRIP_CACHE_KEY);
+
+    if (allTripCacheData == null) {
+      allTripCacheData = new HashMap<>();
+      // persist empty map so key exists in Redis
+      redisTemplate.opsForValue().set(TRIP_CACHE_KEY, allTripCacheData);
+      log.debug("Initialized empty trip-cache in Redis (key={})", TRIP_CACHE_KEY);
     }
 
-    private void markProcessed(String topicDedupKey, String messageId) {
-        if (messageId == null) return;
+    return allTripCacheData;
+  }
 
-        String redisKey = topicDedupKey + messageId;
-
-        // store marker with 24-hour TTL
-        redisStringTemplate.opsForValue().set(redisKey, "1", 24, TimeUnit.HOURS);
+  @KafkaListener(
+      topics = "${kafka.topics.rider-driver-match}",
+      groupId = "${spring.kafka.consumer.group-id}")
+  public void matchFound(byte[] message, Acknowledgment acknowledgment) {
+    // Try to acquire lock
+    String lockValue = tryAcquireLockWithRetry(redisTripLockKey);
+    if (lockValue == null) {
+      log.error(
+          "Unable to acquire lock with retry policy: {} lock key {} timeout milliseconds {} maximum"
+              + " retries {} back off milliseconds. Returning void.",
+          redisTripLockKey,
+          5000,
+          10,
+          200);
+      return;
+    } else {
+      log.info(
+          "Acquired lock with retry policy: {} lock key {} timeout milliseconds {} maximum retries"
+              + " {} back off milliseconds. Returning void.",
+          redisTripLockKey,
+          5000,
+          10,
+          200);
     }
 
-    private String tryAcquireLockWithRetry(String lockKey) {
-        for (int attempt = 1; attempt <= 10; attempt++) {
-            String lockValue = redisDistributedLock.acquireLock(lockKey, 5000);
-            if (lockValue != null) {
-                return lockValue;  // success
-            }
+    // Acknowledge that the message has been received
+    try {
+      log.info("Reached TripService.matchFound.");
 
-            log.warn("Lock not acquired for key {}. Attempt {}/{}. Retrying in {} ms...",
-                    lockKey, attempt, 10, (long) 200);
+      DriverRiderMatchEvent tempEvent = DriverRiderMatchEvent.parseFrom(message);
+      String messageId = tempEvent.getMessageId();
 
-            try {
-                Thread.sleep((long) 200);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return null;
-            }
-        }
-        return null; // all retries failed
+      if (alreadyProcessed(RIDER_DRIVER_MATCH_KAFKA_DEDUP_KEY_PREFIX, messageId)) {
+        log.info(
+            "TripService.matchFound: Duplicate Kafka message detected. Skipping. messageId={}",
+            messageId);
+        acknowledgment.acknowledge();
+        return;
+      }
+
+      Long driverId = tempEvent.getDriverId();
+      Long riderId = tempEvent.getRiderId();
+      String pickUpStation = tempEvent.getPickUpStation();
+
+      // Acknowledge manually
+      markProcessed(RIDER_DRIVER_MATCH_KAFKA_DEDUP_KEY_PREFIX, messageId);
+      acknowledgment.acknowledge();
+
+      // Update the cache => push this pair {riderId, pickUpStation} in the list associated with key
+      // == driverId
+      Map<String, List<TripCache>> allTripCacheData = loadOrInitTripCache();
+
+      // Ensure list exists for driverId
+      List<TripCache> driverList = allTripCacheData.get(String.valueOf(driverId));
+      if (driverList == null) {
+        driverList = new ArrayList<>();
+        allTripCacheData.put(String.valueOf(driverId), driverList);
+      }
+
+      driverList.add(TripCache.builder().riderId(riderId).pickUpStation(pickUpStation).build());
+
+      log.info("Trip: Rider = {} is now travelling with Driver = {}", riderId, driverId);
+
+      // persist updated map
+      redisTemplate.opsForValue().set(TRIP_CACHE_KEY, allTripCacheData);
+    } catch (InvalidProtocolBufferException e) {
+      log.error("Failed to parse DriverRiderMatchEvent message: {}", e.getMessage());
+    } finally {
+      redisDistributedLock.releaseLock(redisTripLockKey, lockValue);
+    }
+  }
+
+  @KafkaListener(
+      topics = "${kafka.topics.ride-completion-topic}",
+      groupId = "${spring.kafka.consumer.group-id}")
+  public void tripCompleted(byte[] message, Acknowledgment acknowledgment) {
+    // Try to acquire lock
+    String lockValue = tryAcquireLockWithRetry(redisTripLockKey);
+    if (lockValue == null) {
+      log.error(
+          "Unable to acquire lock with retry policy: {} lock key {} timeout milliseconds {} maximum"
+              + " retries {} back off milliseconds. Returning void.",
+          redisTripLockKey,
+          5000,
+          10,
+          200);
+      return;
+    } else {
+      log.info(
+          "Acquired lock with retry policy: {} lock key {} timeout milliseconds {} maximum retries"
+              + " {} back off milliseconds. Returning void.",
+          redisTripLockKey,
+          5000,
+          10,
+          200);
     }
 
-    /**
-     * Helper: load trip-cache from Redis, initialize if missing, and persist back.
-     * Ensures top-level map exists.
-     */
-    @SuppressWarnings("unchecked")
-    private Map<String, List<TripCache>> loadOrInitTripCache() {
-        Map<String, List<TripCache>> allTripCacheData =
-                (Map<String, List<TripCache>>) redisTemplate.opsForValue().get(TRIP_CACHE_KEY);
+    try {
+      log.info("Reached TripService.tripCompleted.");
 
-        if (allTripCacheData == null) {
-            allTripCacheData = new HashMap<>();
-            // persist empty map so key exists in Redis
-            redisTemplate.opsForValue().set(TRIP_CACHE_KEY, allTripCacheData);
-            log.debug("Initialized empty trip-cache in Redis (key={})", TRIP_CACHE_KEY);
-        }
+      DriverRideCompletionEvent tempEvent = DriverRideCompletionEvent.parseFrom(message);
+      String messageId = tempEvent.getMessageId();
+      if (alreadyProcessed(TRIP_COMPLETED_KAFKA_DEDUP_KEY_PREFIX, messageId)) {
+        log.info(
+            "NotificationService.tripCompleted: Duplicate Kafka message detected. Skipping."
+                + " messageId={}",
+            messageId);
+        acknowledgment.acknowledge();
+        return;
+      }
 
-        return allTripCacheData;
-    }
+      Long driverId = tempEvent.getDriverId();
 
-    @KafkaListener(topics = "${kafka.topics.rider-driver-match}", groupId = "${spring.kafka.consumer.group-id}")
-    public void matchFound(byte[] message, Acknowledgment acknowledgment) {
-        // Try to acquire lock
-        String lockValue = tryAcquireLockWithRetry(redisTripLockKey);
-        if (lockValue == null) {
-            log.error("Unable to acquire lock with retry policy: {} lock key {} timeout milliseconds {} maximum retries {} back off milliseconds. " +
-                    "Returning void.", redisTripLockKey, 5000, 10, 200);
-            return;
-        } else {
-            log.info("Acquired lock with retry policy: {} lock key {} timeout milliseconds {} maximum retries {} back off milliseconds. " +
-                    "Returning void.", redisTripLockKey, 5000, 10, 200);
-        }
+      // Acknowledge that the message has been received
+      markProcessed(TRIP_COMPLETED_KAFKA_DEDUP_KEY_PREFIX, messageId);
+      acknowledgment.acknowledge();
 
-        // Acknowledge that the message has been received
-        try{
-            log.info("Reached TripService.matchFound.");
+      // Retrieve the trip cache from Redis (initialization not forced here because completion
+      // implies data may or may not exist)
+      @SuppressWarnings("unchecked")
+      Map<String, List<TripCache>> allTripCacheData =
+          (Map<String, List<TripCache>>) redisTemplate.opsForValue().get(TRIP_CACHE_KEY);
 
-            DriverRiderMatchEvent tempEvent = DriverRiderMatchEvent.parseFrom(message);
-            String messageId = tempEvent.getMessageId();
+      if (allTripCacheData == null || !allTripCacheData.containsKey(String.valueOf(driverId))) {
+        // No record found for this driver; nothing to process
+        log.warn("TripService.tripCompleted: No trip cache found for driverId={}", driverId);
+        return;
+      }
 
-            if (alreadyProcessed(RIDER_DRIVER_MATCH_KAFKA_DEDUP_KEY_PREFIX,  messageId)) {
-                log.info("TripService.matchFound: Duplicate Kafka message detected. Skipping. messageId={}",
-                        messageId);
-                acknowledgment.acknowledge();
-                return;
-            }
+      // Get the list of riders associated with this driver
+      List<TripCache> riderList = allTripCacheData.get(String.valueOf(driverId));
+      if (riderList == null || riderList.isEmpty()) {
+        // No riders associated, just remove the driver entry and return
+        allTripCacheData.remove(String.valueOf(driverId));
+        redisTemplate.opsForValue().set(TRIP_CACHE_KEY, allTripCacheData);
+        return;
+      }
 
-            Long driverId = tempEvent.getDriverId();
-            Long riderId = tempEvent.getRiderId();
-            String pickUpStation = tempEvent.getPickUpStation();
+      // 1️⃣ Produce a Kafka event for the driver’s ride completion
+      DriverRideCompletionKafka driverRideCompletion =
+          DriverRideCompletionKafka.newBuilder()
+              .setMessageId(UUID.randomUUID().toString())
+              .setDriverId(driverId)
+              .setEventMessage("Driver Ride Completed")
+              .build();
 
-            // Acknowledge manually
-            markProcessed(RIDER_DRIVER_MATCH_KAFKA_DEDUP_KEY_PREFIX, messageId);
-            acknowledgment.acknowledge();
+      log.info("Trip completion: Driver = {}", driverId);
 
-            // Update the cache => push this pair {riderId, pickUpStation} in the list associated with key == driverId
-            Map<String, List<TripCache>> allTripCacheData = loadOrInitTripCache();
-
-            // Ensure list exists for driverId
-            List<TripCache> driverList = allTripCacheData.get(String.valueOf(driverId));
-            if (driverList == null) {
-                driverList = new ArrayList<>();
-                allTripCacheData.put(String.valueOf(driverId), driverList);
-            }
-
-            driverList.add(TripCache.builder()
-                    .riderId(riderId)
-                    .pickUpStation(pickUpStation)
-                    .build()
-            );
-
-            log.info("Trip: Rider = {} is now travelling with Driver = {}", riderId, driverId);
-
-            // persist updated map
-            redisTemplate.opsForValue().set(TRIP_CACHE_KEY, allTripCacheData);
-        } catch (InvalidProtocolBufferException e){
-            log.error("Failed to parse DriverRiderMatchEvent message: {}", e.getMessage());
-        } finally {
-            redisDistributedLock.releaseLock(redisTripLockKey, lockValue);
-        }
-    }
-
-    @KafkaListener(topics = "${kafka.topics.ride-completion-topic}", groupId = "${spring.kafka.consumer.group-id}")
-    public void tripCompleted(byte[] message, Acknowledgment acknowledgment) {
-        // Try to acquire lock
-        String lockValue = tryAcquireLockWithRetry(redisTripLockKey);
-        if (lockValue == null) {
-            log.error("Unable to acquire lock with retry policy: {} lock key {} timeout milliseconds {} maximum retries {} back off milliseconds. " +
-                    "Returning void.", redisTripLockKey, 5000, 10, 200);
-            return;
-        } else {
-            log.info("Acquired lock with retry policy: {} lock key {} timeout milliseconds {} maximum retries {} back off milliseconds. " +
-                    "Returning void.", redisTripLockKey, 5000, 10, 200);
-        }
-
-        try {
-            log.info("Reached TripService.tripCompleted.");
-
-            DriverRideCompletionEvent tempEvent = DriverRideCompletionEvent.parseFrom(message);
-            String messageId = tempEvent.getMessageId();
-            if (alreadyProcessed(TRIP_COMPLETED_KAFKA_DEDUP_KEY_PREFIX, messageId)) {
-                log.info("NotificationService.tripCompleted: Duplicate Kafka message detected. Skipping. messageId={}",
-                        messageId);
-                acknowledgment.acknowledge();
-                return;
-            }
-
-            Long driverId = tempEvent.getDriverId();
-
-            // Acknowledge that the message has been received
-            markProcessed(TRIP_COMPLETED_KAFKA_DEDUP_KEY_PREFIX, messageId);
-            acknowledgment.acknowledge();
-
-            // Retrieve the trip cache from Redis (initialization not forced here because completion implies data may or may not exist)
-            @SuppressWarnings("unchecked")
-            Map<String, List<TripCache>> allTripCacheData =
-                    (Map<String, List<TripCache>>) redisTemplate.opsForValue().get(TRIP_CACHE_KEY);
-
-            if (allTripCacheData == null || !allTripCacheData.containsKey(String.valueOf(driverId))) {
-                // No record found for this driver; nothing to process
-                log.warn("TripService.tripCompleted: No trip cache found for driverId={}", driverId);
-                return;
-            }
-
-            // Get the list of riders associated with this driver
-            List<TripCache> riderList = allTripCacheData.get(String.valueOf(driverId));
-            if (riderList == null || riderList.isEmpty()) {
-                // No riders associated, just remove the driver entry and return
-                allTripCacheData.remove(String.valueOf(driverId));
-                redisTemplate.opsForValue().set(TRIP_CACHE_KEY, allTripCacheData);
-                return;
-            }
-
-            // 1️⃣ Produce a Kafka event for the driver’s ride completion
-            DriverRideCompletionKafka driverRideCompletion = DriverRideCompletionKafka.newBuilder()
-                    .setMessageId(UUID.randomUUID().toString())
-                    .setDriverId(driverId)
-                    .setEventMessage("Driver Ride Completed")
-                    .build();
-
-            log.info("Trip completion: Driver = {}", driverId);
-
-            CompletableFuture<SendResult<String, byte[]>> future = kafkaTemplate.send(DRIVER_RIDE_COMPLETION_TOPIC,
-                    String.valueOf(driverId) ,driverRideCompletion.toByteArray());
-            future.thenAccept(result -> {
-                log.debug("Event = {} delivered to {}", driverRideCompletion, result.getRecordMetadata().topic());
-            }).exceptionally(ex -> {
+      CompletableFuture<SendResult<String, byte[]>> future =
+          kafkaTemplate.send(
+              DRIVER_RIDE_COMPLETION_TOPIC,
+              String.valueOf(driverId),
+              driverRideCompletion.toByteArray());
+      future
+          .thenAccept(
+              result -> {
+                log.debug(
+                    "Event = {} delivered to {}",
+                    driverRideCompletion,
+                    result.getRecordMetadata().topic());
+              })
+          .exceptionally(
+              ex -> {
                 log.error("Event failed. Error message = {}", ex.getMessage());
                 // Optional: retry, put into Redis dead-letter queue
                 return null;
-            });
+              });
 
-            // 2️⃣ Produce Kafka events for all associated riders
-            for (TripCache riderTrip : riderList) {
-                RiderRideCompletionKafka riderRideCompletion = RiderRideCompletionKafka.newBuilder()
-                        .setMessageId(UUID.randomUUID().toString())
-                        .setRiderId(riderTrip.getRiderId())
-                        .setEventMessage("Rider Ride Completed")
-                        .build();
+      // 2️⃣ Produce Kafka events for all associated riders
+      for (TripCache riderTrip : riderList) {
+        RiderRideCompletionKafka riderRideCompletion =
+            RiderRideCompletionKafka.newBuilder()
+                .setMessageId(UUID.randomUUID().toString())
+                .setRiderId(riderTrip.getRiderId())
+                .setEventMessage("Rider Ride Completed")
+                .build();
 
-                log.info("Trip completion: Rider = {}", riderTrip.getRiderId());
+        log.info("Trip completion: Rider = {}", riderTrip.getRiderId());
 
-                CompletableFuture<SendResult<String, byte[]>> future1 = kafkaTemplate.send(RIDER_RIDE_COMPLETION_TOPIC,
-                        String.valueOf(riderRideCompletion.getRiderId()), riderRideCompletion.toByteArray());
-                future1.thenAccept(result -> {
-                    log.debug("Event = {} delivered to {}", riderRideCompletion, result.getRecordMetadata().topic());
-                }).exceptionally(ex -> {
-                    log.error("Event failed. Error message = {}", ex.getMessage());
-                    // Optional: retry, put into Redis dead-letter queue
-                    return null;
+        CompletableFuture<SendResult<String, byte[]>> future1 =
+            kafkaTemplate.send(
+                RIDER_RIDE_COMPLETION_TOPIC,
+                String.valueOf(riderRideCompletion.getRiderId()),
+                riderRideCompletion.toByteArray());
+        future1
+            .thenAccept(
+                result -> {
+                  log.debug(
+                      "Event = {} delivered to {}",
+                      riderRideCompletion,
+                      result.getRecordMetadata().topic());
+                })
+            .exceptionally(
+                ex -> {
+                  log.error("Event failed. Error message = {}", ex.getMessage());
+                  // Optional: retry, put into Redis dead-letter queue
+                  return null;
                 });
-            }
+      }
 
-            // 3️⃣ Remove the driver’s record from Redis after completion
-            allTripCacheData.remove(String.valueOf(driverId));
-            redisTemplate.opsForValue().set(TRIP_CACHE_KEY, allTripCacheData);
-        } catch (InvalidProtocolBufferException e) {
-            log.error("Failed to parse DriverRideCompletionEvent message: {}", e.getMessage());
-        } finally {
-            redisDistributedLock.releaseLock(redisTripLockKey, lockValue);
-        }
+      // 3️⃣ Remove the driver’s record from Redis after completion
+      allTripCacheData.remove(String.valueOf(driverId));
+      redisTemplate.opsForValue().set(TRIP_CACHE_KEY, allTripCacheData);
+    } catch (InvalidProtocolBufferException e) {
+      log.error("Failed to parse DriverRideCompletionEvent message: {}", e.getMessage());
+    } finally {
+      redisDistributedLock.releaseLock(redisTripLockKey, lockValue);
+    }
+  }
+
+  @KafkaListener(
+      topics = "${kafka.topics.driver-location-topic}",
+      groupId = "${spring.kafka.consumer.group-id}")
+  public void driverLocationUpdates(byte[] message, Acknowledgment acknowledgment) {
+    // Try to acquire lock
+    String lockValue = tryAcquireLockWithRetry(redisTripLockKey);
+    if (lockValue == null) {
+      log.error(
+          "Unable to acquire lock with retry policy: {} lock key {} timeout milliseconds {} maximum"
+              + " retries {} back off milliseconds. Returning void.",
+          redisTripLockKey,
+          5000,
+          10,
+          200);
+      return;
+    } else {
+      log.info(
+          "Acquired lock with retry policy: {} lock key {} timeout milliseconds {} maximum retries"
+              + " {} back off milliseconds. Returning void.",
+          redisTripLockKey,
+          5000,
+          10,
+          200);
     }
 
-    @KafkaListener(topics = "${kafka.topics.driver-location-topic}", groupId = "${spring.kafka.consumer.group-id}")
-    public void driverLocationUpdates(byte[] message, Acknowledgment acknowledgment) {
-        // Try to acquire lock
-        String lockValue = tryAcquireLockWithRetry(redisTripLockKey);
-        if (lockValue == null) {
-            log.error("Unable to acquire lock with retry policy: {} lock key {} timeout milliseconds {} maximum retries {} back off milliseconds. " +
-                    "Returning void.", redisTripLockKey, 5000, 10, 200);
-            return;
-        } else {
-            log.info("Acquired lock with retry policy: {} lock key {} timeout milliseconds {} maximum retries {} back off milliseconds. " +
-                    "Returning void.", redisTripLockKey, 5000, 10, 200);
-        }
+    try {
+      log.info("Reached TripService.driverLocationUpdates.");
 
-        try {
-            log.info("Reached TripService.driverLocationUpdates.");
+      DriverLocationEvent driverLocationEvent = DriverLocationEvent.parseFrom(message);
+      String messageId = driverLocationEvent.getMessageId();
 
-            DriverLocationEvent driverLocationEvent = DriverLocationEvent.parseFrom(message);
-            String messageId = driverLocationEvent.getMessageId();
+      if (alreadyProcessed(DRIVER_UPDATES_KAFKA_DEDUP_KEY_PREFIX, messageId)) {
+        log.info(
+            "TripService.driverLocationUpdates: Duplicate Kafka message detected. Skipping."
+                + " messageId={}",
+            messageId);
+        acknowledgment.acknowledge();
+        return;
+      }
 
-            if (alreadyProcessed(DRIVER_UPDATES_KAFKA_DEDUP_KEY_PREFIX, messageId)) {
-                log.info("TripService.driverLocationUpdates: Duplicate Kafka message detected. Skipping. messageId={}",
-                        messageId);
-                acknowledgment.acknowledge();
-                return;
-            }
+      long driverId = driverLocationEvent.getDriverId();
+      String oldStation = driverLocationEvent.getOldStation();
+      String nextStation = driverLocationEvent.getNextStation();
+      int timeToNextStation = driverLocationEvent.getTimeToNextStation();
+      // Manually acknowledge
+      markProcessed(DRIVER_UPDATES_KAFKA_DEDUP_KEY_PREFIX, messageId);
+      acknowledgment.acknowledge();
 
-            long driverId = driverLocationEvent.getDriverId();
-            String oldStation = driverLocationEvent.getOldStation();
-            String nextStation = driverLocationEvent.getNextStation();
-            int timeToNextStation =  driverLocationEvent.getTimeToNextStation();
-            // Manually acknowledge
-            markProcessed(DRIVER_UPDATES_KAFKA_DEDUP_KEY_PREFIX, messageId);
-            acknowledgment.acknowledge();
+      // Send driver location to all associated riders
+      @SuppressWarnings("unchecked")
+      Map<String, List<TripCache>> allTripCacheData =
+          (Map<String, List<TripCache>>) redisTemplate.opsForValue().get(TRIP_CACHE_KEY);
+      if (allTripCacheData == null || !allTripCacheData.containsKey(String.valueOf(driverId))) {
+        return;
+      }
 
-            // Send driver location to all associated riders
-            @SuppressWarnings("unchecked")
-            Map<String, List<TripCache>> allTripCacheData =
-                    (Map<String, List<TripCache>>) redisTemplate.opsForValue().get(TRIP_CACHE_KEY);
-            if (allTripCacheData == null || !allTripCacheData.containsKey(String.valueOf(driverId))) {
-                return;
-            }
+      List<TripCache> riderList = allTripCacheData.get(String.valueOf(driverId));
+      if (riderList == null || riderList.isEmpty()) {
+        allTripCacheData.remove(String.valueOf(driverId));
+        redisTemplate.opsForValue().set(TRIP_CACHE_KEY, allTripCacheData);
+        return;
+      }
 
-            List<TripCache> riderList = allTripCacheData.get(String.valueOf(driverId));
-            if (riderList == null || riderList.isEmpty()) {
-                allTripCacheData.remove(String.valueOf(driverId));
-                redisTemplate.opsForValue().set(TRIP_CACHE_KEY, allTripCacheData);
-                return;
-            }
+      for (TripCache riderTrip : riderList) {
+        DriverLocationForRiderEvent event =
+            DriverLocationForRiderEvent.newBuilder()
+                .setMessageId(UUID.randomUUID().toString())
+                .setDriverId(driverId)
+                .setRiderId(riderTrip.getRiderId())
+                .setTimeToNextStation(timeToNextStation)
+                .setOldStation(oldStation)
+                .setNextStation(nextStation)
+                .build();
 
-            for (TripCache riderTrip : riderList) {
-                DriverLocationForRiderEvent event = DriverLocationForRiderEvent.newBuilder()
-                        .setMessageId(UUID.randomUUID().toString())
-                        .setDriverId(driverId)
-                        .setRiderId(riderTrip.getRiderId())
-                        .setTimeToNextStation(timeToNextStation)
-                        .setOldStation(oldStation)
-                        .setNextStation(nextStation)
-                        .build();
+        log.info("Driver location: Location = {}", event);
 
-                log.info("Driver location: Location = {}", event);
-
-                CompletableFuture<SendResult<String, byte[]>> future = kafkaTemplate.send(DRIVER_LOCATION_RIDER,
-                        String.valueOf(event.getDriverId()), event.toByteArray());
-                future.thenAccept(result -> {
-                    log.debug("Event = {} delivered to {}", event, result.getRecordMetadata().topic());
-                }).exceptionally(ex -> {
-                    log.error("Event failed. Error message = {}", ex.getMessage());
-                    // Optional: retry, put into Redis dead-letter queue
-                    return null;
+        CompletableFuture<SendResult<String, byte[]>> future =
+            kafkaTemplate.send(
+                DRIVER_LOCATION_RIDER, String.valueOf(event.getDriverId()), event.toByteArray());
+        future
+            .thenAccept(
+                result -> {
+                  log.debug(
+                      "Event = {} delivered to {}", event, result.getRecordMetadata().topic());
+                })
+            .exceptionally(
+                ex -> {
+                  log.error("Event failed. Error message = {}", ex.getMessage());
+                  // Optional: retry, put into Redis dead-letter queue
+                  return null;
                 });
-            }
-        } catch (InvalidProtocolBufferException e) {
-            log.error("Failed to parse DriverLocationEvent message: {}", e.getMessage());
-        } finally {
-            redisDistributedLock.releaseLock(redisTripLockKey, lockValue);
-        }
+      }
+    } catch (InvalidProtocolBufferException e) {
+      log.error("Failed to parse DriverLocationEvent message: {}", e.getMessage());
+    } finally {
+      redisDistributedLock.releaseLock(redisTripLockKey, lockValue);
     }
+  }
 }

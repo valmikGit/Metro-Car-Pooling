@@ -8,6 +8,6 @@ import lombok.Setter;
 @Getter
 @Setter
 public class RiderStatusResponseDTO {
-    private Boolean STATUSSSSS;
-    private String arrivalTime;
+  private Boolean STATUSSSSS;
+  private String arrivalTime;
 }

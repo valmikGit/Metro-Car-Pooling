@@ -10,8 +10,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class RiderWaitingQueueCache {
-    private Long riderId;
-    private String pickUpStation;
-    private Long arrivalTime;
-    private String destinationPlace;
+  private Long riderId;
+  private String pickUpStation;
+  private Long arrivalTime;
+  private String destinationPlace;
 }

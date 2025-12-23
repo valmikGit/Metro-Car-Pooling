@@ -8,14 +8,13 @@ import com.metrocarpool.gateway.dto.UserLoginDTO;
 import com.metrocarpool.gateway.security.JwtConstant;
 import com.metrocarpool.gateway.security.JwtUtil;
 import com.metrocarpool.user.proto.SignUpOrLoginResponse;
+import java.util.Map;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 @RestController
 @Builder
@@ -24,73 +23,75 @@ import java.util.Map;
 @Slf4j
 public class UserController {
 
-    @Autowired
-    private UserGrpcClient userGrpcClient;
+  @Autowired private UserGrpcClient userGrpcClient;
 
-    @Autowired
-    private JwtUtil jwtUtil;
+  @Autowired private JwtUtil jwtUtil;
 
-    @PostMapping("/add-driver")
-    public SignUpOrLoginResponseDTO addDriver(@RequestBody DriverSignUpRequestDTO driverSignUpRequestDTO) {
-        log.info("Reached RiderController.addDriver");
-        log.info("Driver signup: Username = {}", driverSignUpRequestDTO.getUsername());
-        SignUpOrLoginResponse signUpOrLoginResponse = userGrpcClient.DriverSignUpReq(driverSignUpRequestDTO);
-        return SignUpOrLoginResponseDTO.builder()
-                .STATUS_CODE(signUpOrLoginResponse.getSTATUSCODE())
-                .userId(signUpOrLoginResponse.getUserId())
-                .build();
+  @PostMapping("/add-driver")
+  public SignUpOrLoginResponseDTO addDriver(
+      @RequestBody DriverSignUpRequestDTO driverSignUpRequestDTO) {
+    log.info("Reached RiderController.addDriver");
+    log.info("Driver signup: Username = {}", driverSignUpRequestDTO.getUsername());
+    SignUpOrLoginResponse signUpOrLoginResponse =
+        userGrpcClient.DriverSignUpReq(driverSignUpRequestDTO);
+    return SignUpOrLoginResponseDTO.builder()
+        .STATUS_CODE(signUpOrLoginResponse.getSTATUSCODE())
+        .userId(signUpOrLoginResponse.getUserId())
+        .build();
+  }
+
+  @PostMapping("/add-rider")
+  public SignUpOrLoginResponseDTO addRider(
+      @RequestBody RiderSignUpRequestDTO riderSignUpRequestDTO) {
+    log.info("Reached RiderController.addRider");
+    log.info("Rider signup: Username = {}", riderSignUpRequestDTO.getUsername());
+    SignUpOrLoginResponse signUpOrLoginResponse =
+        userGrpcClient.RiderSignUpReq(riderSignUpRequestDTO);
+    return SignUpOrLoginResponseDTO.builder()
+        .STATUS_CODE(signUpOrLoginResponse.getSTATUSCODE())
+        .userId(signUpOrLoginResponse.getUserId())
+        .build();
+  }
+
+  @PostMapping("/login-driver")
+  public ResponseEntity<?> loginDriver(@RequestBody UserLoginDTO userLoginDTO) {
+    log.info("Reached RiderController.loginDriver");
+    log.info("Driver login: Username = {}", userLoginDTO.getUsername());
+    SignUpOrLoginResponse signUpOrLoginResponse = userGrpcClient.DriverLoginReq(userLoginDTO);
+    if (signUpOrLoginResponse.getSTATUSCODE() == 200) {
+      // Generate JWT with "username" claim
+      String token = jwtUtil.generateToken(userLoginDTO.getUsername());
+
+      log.info("Received sign up or login response = {}", signUpOrLoginResponse);
+
+      // Return token in both body and Authorization header
+      return ResponseEntity.ok()
+          .header(JwtConstant.JWT_HEADER, "Bearer " + token)
+          .body(Map.of("token", token, "userId", signUpOrLoginResponse.getUserId()));
+    } else {
+      log.info("Received sign up or login response = {}", signUpOrLoginResponse);
+      return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(signUpOrLoginResponse);
     }
+  }
 
-    @PostMapping("/add-rider")
-    public SignUpOrLoginResponseDTO addRider(@RequestBody RiderSignUpRequestDTO riderSignUpRequestDTO) {
-        log.info("Reached RiderController.addRider");
-        log.info("Rider signup: Username = {}", riderSignUpRequestDTO.getUsername());
-        SignUpOrLoginResponse signUpOrLoginResponse = userGrpcClient.RiderSignUpReq(riderSignUpRequestDTO);
-        return SignUpOrLoginResponseDTO.builder()
-                .STATUS_CODE(signUpOrLoginResponse.getSTATUSCODE())
-                .userId(signUpOrLoginResponse.getUserId())
-                .build();
+  @PostMapping("/login-rider")
+  public ResponseEntity<?> loginRider(@RequestBody UserLoginDTO userLoginDTO) {
+    log.info("Reached RiderController.loginRider");
+    log.info("Rider login: Username = {}", userLoginDTO.getUsername());
+    SignUpOrLoginResponse signUpOrLoginResponse = userGrpcClient.RiderLoginReq(userLoginDTO);
+    if (signUpOrLoginResponse.getSTATUSCODE() == 200) {
+      // Generate JWT with "username" claim
+      String token = jwtUtil.generateToken(userLoginDTO.getUsername());
+
+      log.info("Received sign up or login response = {}", signUpOrLoginResponse);
+
+      // Return token in both body and Authorization header
+      return ResponseEntity.ok()
+          .header(JwtConstant.JWT_HEADER, "Bearer " + token)
+          .body(Map.of("token", token, "userId", signUpOrLoginResponse.getUserId()));
+    } else {
+      log.info("Received sign up or login response = {}", signUpOrLoginResponse);
+      return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(signUpOrLoginResponse);
     }
-
-    @PostMapping("/login-driver")
-    public ResponseEntity<?> loginDriver(@RequestBody UserLoginDTO userLoginDTO) {
-        log.info("Reached RiderController.loginDriver");
-        log.info("Driver login: Username = {}", userLoginDTO.getUsername());
-        SignUpOrLoginResponse signUpOrLoginResponse = userGrpcClient.DriverLoginReq(userLoginDTO);
-        if (signUpOrLoginResponse.getSTATUSCODE() == 200) {
-            // Generate JWT with "username" claim
-            String token = jwtUtil.generateToken(userLoginDTO.getUsername());
-
-            log.info("Received sign up or login response = {}",  signUpOrLoginResponse);
-
-            // Return token in both body and Authorization header
-            return ResponseEntity.ok()
-                    .header(JwtConstant.JWT_HEADER, "Bearer " + token)
-                    .body(Map.of("token", token, "userId", signUpOrLoginResponse.getUserId()));
-        } else {
-            log.info("Received sign up or login response = {}", signUpOrLoginResponse);
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(signUpOrLoginResponse);
-        }
-    }
-
-    @PostMapping("/login-rider")
-    public ResponseEntity<?> loginRider(@RequestBody UserLoginDTO userLoginDTO) {
-        log.info("Reached RiderController.loginRider");
-        log.info("Rider login: Username = {}", userLoginDTO.getUsername());
-        SignUpOrLoginResponse signUpOrLoginResponse = userGrpcClient.RiderLoginReq(userLoginDTO);
-        if (signUpOrLoginResponse.getSTATUSCODE() == 200) {
-            // Generate JWT with "username" claim
-            String token = jwtUtil.generateToken(userLoginDTO.getUsername());
-
-            log.info("Received sign up or login response = {}",  signUpOrLoginResponse);
-
-            // Return token in both body and Authorization header
-            return ResponseEntity.ok()
-                    .header(JwtConstant.JWT_HEADER, "Bearer " + token)
-                    .body(Map.of("token", token, "userId", signUpOrLoginResponse.getUserId()));
-        } else {
-            log.info("Received sign up or login response = {}", signUpOrLoginResponse);
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(signUpOrLoginResponse);
-        }
-    }
+  }
 }

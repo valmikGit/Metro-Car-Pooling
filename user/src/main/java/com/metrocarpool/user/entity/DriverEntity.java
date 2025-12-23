@@ -12,14 +12,16 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class DriverEntity {
-    @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.AUTO)
+  private Long id;
 
-    @Column(unique = true,  nullable = false)
-    private String username;
-    @Column(nullable = false)
-    private String password;
-    @Column(nullable = false)
-    private Long licenseId;
+  @Column(unique = true, nullable = false)
+  private String username;
+
+  @Column(nullable = false)
+  private String password;
+
+  @Column(nullable = false)
+  private Long licenseId;
 }

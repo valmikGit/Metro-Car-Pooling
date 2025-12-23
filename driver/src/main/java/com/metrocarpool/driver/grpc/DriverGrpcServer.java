@@ -14,35 +14,36 @@ import org.springframework.grpc.server.service.GrpcService;
 @Slf4j
 public class DriverGrpcServer extends DriverServiceGrpc.DriverServiceImplBase {
 
-    private final DriverService driverService;
+  private final DriverService driverService;
 
-    @Override
-    public void postDriverInfo(PostDriver request, StreamObserver<DriverStatusResponse> responseObserver) {
-        try {
-            // ✅ Call the business logic
-            boolean success = driverService.processDriverInfo(
-                    request.getDriverId(),
-                    request.getRouteStationsList(),
-                    request.getFinalDestination(),
-                    request.getAvailableSeats()
-            );
+  @Override
+  public void postDriverInfo(
+      PostDriver request, StreamObserver<DriverStatusResponse> responseObserver) {
+    try {
+      // ✅ Call the business logic
+      boolean success =
+          driverService.processDriverInfo(
+              request.getDriverId(),
+              request.getRouteStationsList(),
+              request.getFinalDestination(),
+              request.getAvailableSeats());
 
-            // ✅ Build the response
-            DriverStatusResponse response = DriverStatusResponse.newBuilder()
-                    .setStatus(success)
-                    .build();
+      // ✅ Build the response
+      DriverStatusResponse response = DriverStatusResponse.newBuilder().setStatus(success).build();
 
-            log.info("Reached DriverGrpcServer.postDriverInfo with request = {} and responseObserver = {}",
-                    request, responseObserver);
-            log.info("Driver Status Response: {}", response);
+      log.info(
+          "Reached DriverGrpcServer.postDriverInfo with request = {} and responseObserver = {}",
+          request,
+          responseObserver);
+      log.info("Driver Status Response: {}", response);
 
-            // ✅ Send the response back to the client
-            responseObserver.onNext(response);
-            responseObserver.onCompleted();
-        } catch (Exception e) {
-            // ❌ Handle any exception gracefully
-            log.error("Error in DriverGrpcServer.postDriverInfo = ", e);
-            responseObserver.onError(e);
-        }
+      // ✅ Send the response back to the client
+      responseObserver.onNext(response);
+      responseObserver.onCompleted();
+    } catch (Exception e) {
+      // ❌ Handle any exception gracefully
+      log.error("Error in DriverGrpcServer.postDriverInfo = ", e);
+      responseObserver.onError(e);
     }
+  }
 }

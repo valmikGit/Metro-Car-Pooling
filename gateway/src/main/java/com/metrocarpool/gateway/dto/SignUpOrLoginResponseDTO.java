@@ -6,6 +6,6 @@ import lombok.Data;
 @Builder
 @Data
 public class SignUpOrLoginResponseDTO {
-    private int STATUS_CODE;
-    private Long userId;
+  private int STATUS_CODE;
+  private Long userId;
 }

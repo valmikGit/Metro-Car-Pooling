@@ -10,8 +10,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableKafka
 public class MatchingApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(MatchingApplication.class, args);
-	}
-
+  public static void main(String[] args) {
+    SpringApplication.run(MatchingApplication.class, args);
+  }
 }

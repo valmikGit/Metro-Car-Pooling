@@ -10,39 +10,41 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 @Configuration
 public class RedisConfig {
 
-    @Bean
-    public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory) {
-        RedisTemplate<String, Object> template = new RedisTemplate<>();
-        template.setConnectionFactory(connectionFactory);
+  @Bean
+  public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory) {
+    RedisTemplate<String, Object> template = new RedisTemplate<>();
+    template.setConnectionFactory(connectionFactory);
 
-        // Use JSON serialization for values, String for keys
-        // Use JSON serialization for values, String for keys
-        template.setKeySerializer(new StringRedisSerializer());
-        
-        com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
-        objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
-        objectMapper.activateDefaultTyping(
-                objectMapper.getPolymorphicTypeValidator(),
-                com.fasterxml.jackson.databind.ObjectMapper.DefaultTyping.NON_FINAL,
-                com.fasterxml.jackson.annotation.JsonTypeInfo.As.PROPERTY);
-        
-        template.setValueSerializer(new GenericJackson2JsonRedisSerializer(objectMapper));
+    // Use JSON serialization for values, String for keys
+    // Use JSON serialization for values, String for keys
+    template.setKeySerializer(new StringRedisSerializer());
 
-        // initialize serializers / internal fields
-        template.afterPropertiesSet();
+    com.fasterxml.jackson.databind.ObjectMapper objectMapper =
+        new com.fasterxml.jackson.databind.ObjectMapper();
+    objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
+    objectMapper.activateDefaultTyping(
+        objectMapper.getPolymorphicTypeValidator(),
+        com.fasterxml.jackson.databind.ObjectMapper.DefaultTyping.NON_FINAL,
+        com.fasterxml.jackson.annotation.JsonTypeInfo.As.PROPERTY);
 
-        return template;
-    }
+    template.setValueSerializer(new GenericJackson2JsonRedisSerializer(objectMapper));
 
-    // Additional template to read/write raw string values for tolerant parsing of legacy/plain JSON
-    @Bean
-    public RedisTemplate<String, String> redisStringTemplate(RedisConnectionFactory connectionFactory) {
-        RedisTemplate<String, String> template = new RedisTemplate<>();
-        StringRedisSerializer str = new StringRedisSerializer();
-        template.setConnectionFactory(connectionFactory);
-        template.setKeySerializer(str);
-        template.setValueSerializer(str);
-        template.afterPropertiesSet();
-        return template;
-    }
+    // initialize serializers / internal fields
+    template.afterPropertiesSet();
+
+    return template;
+  }
+
+  // Additional template to read/write raw string values for tolerant parsing of legacy/plain JSON
+  @Bean
+  public RedisTemplate<String, String> redisStringTemplate(
+      RedisConnectionFactory connectionFactory) {
+    RedisTemplate<String, String> template = new RedisTemplate<>();
+    StringRedisSerializer str = new StringRedisSerializer();
+    template.setConnectionFactory(connectionFactory);
+    template.setKeySerializer(str);
+    template.setValueSerializer(str);
+    template.afterPropertiesSet();
+    return template;
+  }
 }
